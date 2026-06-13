@@ -785,28 +785,31 @@ const PROG26_CONFIG = {
 };
 
 // ─── LOAD DATA ────────────────────────────────────────────────────
-async function loadData() {
+function loadData() {
   const overlay = document.getElementById('loading-overlay');
   overlay.style.display = 'flex';
-  try {
-    const url = `${APPS_SCRIPT_URL}?action=read&sheet=${encodeURIComponent(SHEET_NAME)}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text = await res.text();
-    let json;
-    try {
-      json = JSON.parse(text);
-    } catch(pe) {
-      throw new Error('Risposta non JSON: ' + text.slice(0, 120));
+
+  const callbackName = 'makCallback_' + Date.now();
+  const script = document.createElement('script');
+
+  window[callbackName] = function(data) {
+    delete window[callbackName];
+    document.body.removeChild(script);
+    if (data.error) {
+      showToast('⚠ ' + data.error, 8000);
+      overlay.style.display = 'none';
+      return;
     }
-    if (json.error) throw new Error(json.error);
-    if (!json.rows || json.rows.length === 0) throw new Error('Foglio vuoto o nome foglio errato. Fogli trovati: controlla Apps Script.');
-    parseRows(json.rows);
-  } catch(e) {
-    console.error('Errore caricamento:', e);
-    showToast('⚠ ' + e.message, 8000);
+    parseRows(data.rows);
+  };
+
+  script.onerror = function() {
+    showToast('⚠ Errore caricamento script', 8000);
     overlay.style.display = 'none';
-  }
+  };
+
+  script.src = APPS_SCRIPT_URL + '?action=read&sheet=' + encodeURIComponent(SHEET_NAME) + '&callback=' + callbackName;
+  document.body.appendChild(script);
 }
 
 function parseRows(rows) {
