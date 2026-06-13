@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAK 2026 — CRM</title>
+<style>
+  :root {
+    --col-bg: #1a1d23;
+    --col-sidebar: #13151a;
+    --col-surface: #ffffff;
+    --col-surface2: #f4f5f7;
+    --col-border: #e2e4e9;
+    --col-border-strong: #c8ccd6;
+    --col-text: #111318;
+    --col-text-muted: #5c6070;
+    --col-text-faint: #9aa0b0;
+    --col-teal: #1D9E75;
+    --col-teal-light: #E1F5EE;
+    --col-teal-dark: #0F6E56;
+    --col-amber: #BA7517;
+    --col-amber-light: #FAEEDA;
+    --col-red: #A32D2D;
+    --col-red-light: #FCEBEB;
+    --col-purple: #534AB7;
+    --col-purple-light: #EEEDFE;
+    --col-blue: #185FA5;
+    --col-blue-light: #E6F1FB;
+    --col-gray-light: #F1EFE8;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14px;
+    color: var(--col-text);
+    background: var(--col-surface2);
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* SIDEBAR */
+  #sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--col-sidebar);
+    color: #e0e3ea;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #sidebar-header {
+    padding: 20px 16px 14px;
+    border-bottom: 1px solid #2a2d36;
+  }
+
+  #sidebar-header .logo {
+    font-size: 18px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.5px;
+  }
+
+  #sidebar-header .logo span {
+    color: var(--col-teal);
+  }
+
+  #sidebar-header .sub {
+    font-size: 11px;
+    color: #606472;
+    margin-top: 2px;
+    letter-spacing: 0.3px;
+  }
+
+  .sidebar-section {
+    padding: 12px 8px 4px;
+  }
+
+  .sidebar-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    color: #464a58;
+    padding: 0 8px;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #9aa0b0;
+    transition: background 0.12s, color 0.12s;
+    user-select: none;
+  }
+
+  .sidebar-item:hover { background: #1e2028; color: #d0d4de; }
+  .sidebar-item.active { background: #1e2028; color: #ffffff; }
+  .sidebar-item .dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .sidebar-item .count {
+    margin-left: auto;
+    font-size: 11px;
+    background: #2a2d36;
+    color: #606472;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-weight: 500;
+  }
+  .sidebar-item.active .count { background: #2d3540; color: #9aa0b0; }
+
+  .sidebar-stats {
+    margin-top: auto;
+    padding: 12px 8px;
+    border-top: 1px solid #1e2028;
+  }
+
+  .stat-mini {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 8px;
+    font-size: 12px;
+    color: #464a58;
+  }
+  .stat-mini strong { color: #9aa0b0; }
+
+  /* MAIN */
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* TOPBAR */
+  #topbar {
+    background: var(--col-surface);
+    border-bottom: 1px solid var(--col-border);
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  #search-wrap {
+    flex: 1;
+    max-width: 340px;
+    position: relative;
+  }
+
+  #search {
+    width: 100%;
+    padding: 7px 12px 7px 32px;
+    border: 1px solid var(--col-border);
+    border-radius: var(--radius);
+    font-size: 13px;
+    color: var(--col-text);
+    background: var(--col-surface2);
+    outline: none;
+  }
+  #search:focus { border-color: var(--col-teal); background: #fff; }
+  #search-icon {
+    position: absolute;
+    left: 10px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--col-text-faint);
+    pointer-events: none;
+    font-size: 14px;
+  }
+
+  .filter-select {
+    padding: 7px 10px;
+    border: 1px solid var(--col-border);
+    border-radius: var(--radius);
+    font-size: 13px;
+    color: var(--col-text);
+    background: var(--col-surface2);
+    outline: none;
+    cursor: pointer;
+  }
+  .filter-select:focus { border-color: var(--col-teal); }
+
+  .topbar-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .badge-kpi {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--col-teal-light);
+    color: var(--col-teal-dark);
+  }
+
+  .btn {
+    padding: 7px 14px;
+    border: 1px solid var(--col-border-strong);
+    border-radius: var(--radius);
+    font-size: 13px;
+    background: var(--col-surface);
+    cursor: pointer;
+    color: var(--col-text);
+    font-weight: 500;
+    transition: background 0.12s;
+  }
+  .btn:hover { background: var(--col-surface2); }
+  .btn-primary {
+    background: var(--col-teal);
+    color: white;
+    border-color: var(--col-teal);
+  }
+  .btn-primary:hover { background: var(--col-teal-dark); }
+
+  /* CONTENT AREA */
+  #content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* CLIENT LIST */
+  #list-panel {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+  }
+
+  .list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .list-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--col-text-muted);
+  }
+
+  /* TABLE */
+  #client-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  #client-table th {
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--col-text-faint);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--col-border);
+    background: var(--col-surface2);
+    position: sticky;
+    top: 0;
+    white-space: nowrap;
+  }
+
+  #client-table tbody tr {
+    border-bottom: 1px solid var(--col-border);
+    cursor: pointer;
+    transition: background 0.08s;
+  }
+  #client-table tbody tr:hover { background: #f0f7f5; }
+  #client-table tbody tr.selected { background: var(--col-teal-light); }
+
+  #client-table td {
+    padding: 9px 10px;
+    vertical-align: middle;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .prog-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .fat-cell { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+
+  .visita-badge {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* DETAIL PANEL */
+  #detail-panel {
+    width: 360px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--col-border);
+    background: var(--col-surface);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #detail-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--col-text-faint);
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  #detail-content { display: none; padding: 20px; flex-direction: column; gap: 0; }
+  #detail-content.visible { display: flex; }
+
+  .detail-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--col-border);
+  }
+
+  .avatar {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: var(--col-teal-light);
+    color: var(--col-teal-dark);
+    font-weight: 700;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    letter-spacing: -0.5px;
+  }
+
+  .detail-name { font-size: 15px; font-weight: 700; color: var(--col-text); line-height: 1.2; }
+  .detail-meta { font-size: 12px; color: var(--col-text-muted); margin-top: 2px; }
+
+  .detail-section { margin-bottom: 16px; }
+  .detail-section-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--col-text-faint);
+    margin-bottom: 8px;
+  }
+
+  .field-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--col-border);
+    gap: 8px;
+  }
+  .field-row:last-child { border-bottom: none; }
+
+  .field-label {
+    font-size: 12px;
+    color: var(--col-text-muted);
+    flex-shrink: 0;
+    min-width: 90px;
+  }
+
+  .field-value {
+    font-size: 13px;
+    color: var(--col-text);
+    text-align: right;
+    word-break: break-word;
+    font-weight: 500;
+  }
+
+  .field-input {
+    border: 1px solid var(--col-border);
+    border-radius: 5px;
+    padding: 4px 8px;
+    font-size: 13px;
+    color: var(--col-text);
+    background: var(--col-surface2);
+    text-align: right;
+    width: 160px;
+    outline: none;
+    font-weight: 500;
+  }
+  .field-input:focus { border-color: var(--col-teal); background: #fff; }
+
+  .fat-bars {
+    display: flex;
+    gap: 6px;
+    align-items: flex-end;
+    height: 44px;
+    margin-top: 6px;
+  }
+
+  .fat-bar-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .fat-bar {
+    width: 100%;
+    border-radius: 3px 3px 0 0;
+    min-height: 2px;
+    transition: height 0.3s ease;
+  }
+
+  .fat-bar-label { font-size: 10px; color: var(--col-text-faint); }
+  .fat-bar-val { font-size: 11px; font-weight: 700; color: var(--col-text-muted); }
+
+  .detail-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 16px;
+    border-top: 1px solid var(--col-border);
+    flex-wrap: wrap;
+  }
+
+  .action-btn {
+    flex: 1;
+    min-width: 100px;
+    padding: 8px 10px;
+    border: 1px solid var(--col-border-strong);
+    border-radius: var(--radius);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--col-surface);
+    color: var(--col-text);
+    text-align: center;
+    transition: background 0.12s;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+  }
+  .action-btn:hover { background: var(--col-surface2); }
+  .action-btn.green { color: var(--col-teal-dark); border-color: var(--col-teal); }
+  .action-btn.green:hover { background: var(--col-teal-light); }
+
+  /* TOAST */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: #1a1d23;
+    color: #e0e3ea;
+    padding: 10px 18px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 500;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 1000;
+    max-width: 320px;
+  }
+  #toast.show { opacity: 1; }
+
+  /* LOADING */
+  #loading-overlay {
+    position: fixed; inset: 0;
+    background: var(--col-surface2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    gap: 12px;
+    color: var(--col-text-muted);
+    font-size: 14px;
+  }
+
+  .spinner {
+    width: 28px; height: 28px;
+    border: 3px solid var(--col-border);
+    border-top-color: var(--col-teal);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* AI Panel */
+  #ai-panel {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    width: 340px;
+    background: var(--col-surface);
+    border: 1px solid var(--col-border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 500;
+  }
+  #ai-panel.open { display: flex; }
+
+  #ai-header {
+    padding: 12px 14px;
+    background: var(--col-sidebar);
+    color: #e0e3ea;
+    font-weight: 600;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  #ai-messages {
+    padding: 12px;
+    flex: 1;
+    overflow-y: auto;
+    max-height: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .ai-msg { padding: 8px 10px; border-radius: var(--radius); }
+  .ai-msg.user { background: var(--col-teal-light); color: var(--col-teal-dark); align-self: flex-end; max-width: 90%; }
+  .ai-msg.assistant { background: var(--col-surface2); color: var(--col-text); align-self: flex-start; max-width: 95%; }
+
+  #ai-input-row {
+    display: flex;
+    gap: 6px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--col-border);
+  }
+
+  #ai-input {
+    flex: 1;
+    padding: 7px 10px;
+    border: 1px solid var(--col-border);
+    border-radius: var(--radius);
+    font-size: 13px;
+    outline: none;
+  }
+  #ai-input:focus { border-color: var(--col-teal); }
+
+  #ai-btn-float {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    background: var(--col-teal);
+    color: white;
+    border: none;
+    border-radius: 24px;
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 12px rgba(29,158,117,0.3);
+    z-index: 400;
+    transition: background 0.12s;
+  }
+  #ai-btn-float:hover { background: var(--col-teal-dark); }
+  #ai-panel.open ~ #ai-btn-float { display: none; }
+
+  /* Responsive table */
+  @media (max-width: 900px) {
+    #detail-panel { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <span>Caricamento clienti...</span>
+</div>
+
+<!-- SIDEBAR -->
+<nav id="sidebar">
+  <div id="sidebar-header">
+    <div class="logo">MAK<span>2026</span></div>
+    <div class="sub">CRM — Stefano</div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">Segmenti</div>
+    <div class="sidebar-item active" data-filter="ALL">
+      <span class="dot" style="background:#9aa0b0"></span>
+      Tutti
+      <span class="count" id="cnt-all">—</span>
+    </div>
+    <div class="sidebar-item" data-filter="WORKBOX">
+      <span class="dot" style="background:var(--col-teal)"></span>
+      Workbox (TOP)
+      <span class="count" id="cnt-workbox">—</span>
+    </div>
+    <div class="sidebar-item" data-filter="CATALOGOSP">
+      <span class="dot" style="background:var(--col-blue)"></span>
+      Catalogo Spring
+      <span class="count" id="cnt-cat">—</span>
+    </div>
+    <div class="sidebar-item" data-filter="OK24NO25">
+      <span class="dot" style="background:var(--col-amber)"></span>
+      OK24 No Vis25
+      <span class="count" id="cnt-ok24">—</span>
+    </div>
+    <div class="sidebar-item" data-filter="OK25NOVIS">
+      <span class="dot" style="background:var(--col-purple)"></span>
+      OK25 No Visita
+      <span class="count" id="cnt-ok25">—</span>
+    </div>
+    <div class="sidebar-item" data-filter="DORMIENTI">
+      <span class="dot" style="background:var(--col-red)"></span>
+      Dormienti
+      <span class="count" id="cnt-dorm">—</span>
+    </div>
+    <div class="sidebar-item" data-filter="NONINT">
+      <span class="dot" style="background:#464a58"></span>
+      Non interessati
+      <span class="count" id="cnt-nonint">—</span>
+    </div>
+    <div class="sidebar-item" data-filter="ACTIVE">
+      <span class="dot" style="background:#1D9E75"></span>
+      Attivi (nessun tag)
+      <span class="count" id="cnt-active">—</span>
+    </div>
+  </div>
+
+  <div class="sidebar-section" style="margin-top:8px">
+    <div class="sidebar-label">Visite 2026</div>
+    <div class="sidebar-item" data-filter="VISITA_YES">
+      <span class="dot" style="background:var(--col-teal)"></span>
+      Visitati
+      <span class="count" id="cnt-vis-yes">—</span>
+    </div>
+    <div class="sidebar-item" data-filter="VISITA_NO">
+      <span class="dot" style="background:var(--col-red)"></span>
+      Da visitare
+      <span class="count" id="cnt-vis-no">—</span>
+    </div>
+  </div>
+
+  <div class="sidebar-stats">
+    <div class="stat-mini">Fat. 2025 <strong id="stat-fat25">—</strong></div>
+    <div class="stat-mini">Fat. 2026 <strong id="stat-fat26">—</strong></div>
+    <div class="stat-mini">Clienti attivi <strong id="stat-attivi">—</strong></div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div id="main">
+  <div id="topbar">
+    <div id="search-wrap">
+      <span id="search-icon">🔍</span>
+      <input id="search" type="text" placeholder="Cerca cliente, città, codice…">
+    </div>
+    <select class="filter-select" id="filter-tipo">
+      <option value="">Tutti i tipi</option>
+    </select>
+    <select class="filter-select" id="filter-network">
+      <option value="">Tutti i network</option>
+    </select>
+    <select class="filter-select" id="filter-prov">
+      <option value="">Tutte le prov.</option>
+      <option value="MI">MI</option>
+      <option value="MB">MB</option>
+      <option value="LO">LO</option>
+    </select>
+    <div class="topbar-right">
+      <span class="badge-kpi" id="result-count">—</span>
+      <button class="btn btn-primary" id="btn-sync">⟳ Sync</button>
+    </div>
+  </div>
+
+  <div id="content">
+    <div id="list-panel">
+      <div class="list-header">
+        <span class="list-title" id="current-filter-label">Tutti i clienti</span>
+      </div>
+      <table id="client-table">
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>Città</th>
+            <th>Tipo</th>
+            <th>Network</th>
+            <th>Prog26</th>
+            <th style="text-align:right">2024</th>
+            <th style="text-align:right">2025</th>
+            <th style="text-align:right">2026</th>
+            <th style="text-align:center">Vis26</th>
+          </tr>
+        </thead>
+        <tbody id="client-tbody"></tbody>
+      </table>
+    </div>
+
+    <div id="detail-panel">
+      <div id="detail-empty">
+        <span style="font-size:28px">📋</span>
+        <span>Seleziona un cliente</span>
+      </div>
+      <div id="detail-content">
+        <!-- riempito da JS -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- AI Float button -->
+<button id="ai-btn-float" onclick="toggleAI()">✦ Chiedi a Claude</button>
+
+<!-- AI Panel -->
+<div id="ai-panel">
+  <div id="ai-header">
+    <span>✦ Assistente MAK</span>
+    <button onclick="toggleAI()" style="background:none;border:none;color:#9aa0b0;cursor:pointer;font-size:16px;line-height:1">×</button>
+  </div>
+  <div id="ai-messages">
+    <div class="ai-msg assistant">Ciao Stefano! Dimmi cosa ti serve: analisi clienti, draft messaggio WhatsApp, priorità visite, segmentazione — sono qui.</div>
+  </div>
+  <div id="ai-input-row">
+    <input id="ai-input" type="text" placeholder="Scrivi..." onkeydown="if(event.key==='Enter')sendAI()">
+    <button class="btn btn-primary" onclick="sendAI()">Invia</button>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyWvuv29S1lF3YnYbZ9zZIfcSsWMfyDUSM7oA6GYIoVMcU2jdtY9Ulek1B-bnEx0-2wew/exec';
+const SHEET_NAME = 'Clienti';
+
+// ─── STATE ────────────────────────────────────────────────────────
+let allClients = [];
+let filteredClients = [];
+let currentFilter = 'ALL';
+let selectedIndex = null;
+let selectedRow = null;
+let pendingEdits = {};
+let aiMessages = [{ role: 'assistant', content: 'Ciao Stefano! Dimmi cosa ti serve: analisi clienti, draft messaggio WhatsApp, priorità visite, segmentazione — sono qui.' }];
+
+// ─── PROG26 CONFIG ────────────────────────────────────────────────
+const PROG26_CONFIG = {
+  'WORKBOX':    { label: 'Workbox',     bg: '#E1F5EE', color: '#0F6E56' },
+  'CATALOGOSP': { label: 'Cat. Spring', bg: '#E6F1FB', color: '#0C447C' },
+  'OK24NO25':   { label: 'OK24 No25',  bg: '#FAEEDA', color: '#633806' },
+  'OK25NOVIS':  { label: 'OK25 NoVis', bg: '#EEEDFE', color: '#3C3489' },
+  'DORMIENTI':  { label: 'Dormiente',  bg: '#FCEBEB', color: '#791F1F' },
+  'NONINT':     { label: 'Non int.',   bg: '#F1EFE8', color: '#444441' },
+  '':           { label: 'Attivo',     bg: '#E1F5EE', color: '#0F6E56' },
+};
+
+// ─── LOAD DATA ────────────────────────────────────────────────────
+async function loadData() {
+  const overlay = document.getElementById('loading-overlay');
+  overlay.style.display = 'flex';
+  try {
+    const url = `${APPS_SCRIPT_URL}?action=read&sheet=${encodeURIComponent(SHEET_NAME)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch(pe) {
+      throw new Error('Risposta non JSON: ' + text.slice(0, 120));
+    }
+    if (json.error) throw new Error(json.error);
+    if (!json.rows || json.rows.length === 0) throw new Error('Foglio vuoto o nome foglio errato. Fogli trovati: controlla Apps Script.');
+    parseRows(json.rows);
+  } catch(e) {
+    console.error('Errore caricamento:', e);
+    showToast('⚠ ' + e.message, 8000);
+    overlay.style.display = 'none';
+  }
+}
+
+function parseRows(rows) {
+  allClients = rows.filter(r => r['CLIENTE'] && r['CLIENTE'].toString().trim() !== '');
+  buildFilters();
+  applyFilter();
+  updateSidebarCounts();
+  updateStats();
+  document.getElementById('loading-overlay').style.display = 'none';
+}
+
+// ─── FILTERS ─────────────────────────────────────────────────────
+function buildFilters() {
+  const tipiSet = new Set();
+  const networkSet = new Set();
+  allClients.forEach(c => {
+    if (c['TIPO']) tipiSet.add(c['TIPO']);
+    if (c['NETWORK']) networkSet.add(c['NETWORK']);
+  });
+
+  const tipoSel = document.getElementById('filter-tipo');
+  tipiSet.forEach(t => {
+    const o = document.createElement('option');
+    o.value = o.textContent = t;
+    tipoSel.appendChild(o);
+  });
+
+  const netSel = document.getElementById('filter-network');
+  [...networkSet].sort().forEach(n => {
+    const o = document.createElement('option');
+    o.value = o.textContent = n;
+    netSel.appendChild(o);
+  });
+}
+
+function applyFilter() {
+  const q = document.getElementById('search').value.toLowerCase().trim();
+  const tipo = document.getElementById('filter-tipo').value;
+  const network = document.getElementById('filter-network').value;
+  const prov = document.getElementById('filter-prov').value;
+
+  filteredClients = allClients.filter(c => {
+    // PROG26 filter
+    if (currentFilter === 'ACTIVE') {
+      if (c['PROG26'] && c['PROG26'].trim() !== '') return false;
+    } else if (currentFilter === 'VISITA_YES') {
+      const v = c['VISITA 2026'] || '';
+      if (!v || v.toString().trim() === '') return false;
+    } else if (currentFilter === 'VISITA_NO') {
+      const v = c['VISITA 2026'] || '';
+      if (v && v.toString().trim() !== '') return false;
+    } else if (currentFilter !== 'ALL') {
+      if ((c['PROG26'] || '').trim().toUpperCase() !== currentFilter) return false;
+    }
+
+    if (tipo && c['TIPO'] !== tipo) return false;
+    if (network && c['NETWORK'] !== network) return false;
+    if (prov && c['PR'] !== prov) return false;
+
+    if (q) {
+      const hay = [c['CLIENTE'], c['CITTÀ'], c['COD.'], c['NOME'], c['TELEFONO']].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  renderTable();
+  document.getElementById('result-count').textContent = `${filteredClients.length} clienti`;
+}
+
+// ─── RENDER TABLE ─────────────────────────────────────────────────
+function renderTable() {
+  const tbody = document.getElementById('client-tbody');
+  tbody.innerHTML = '';
+
+  filteredClients.forEach((c, i) => {
+    const tr = document.createElement('tr');
+    if (selectedIndex === i) tr.classList.add('selected');
+
+    const prog26 = (c['PROG26'] || '').trim().toUpperCase();
+    const pc = PROG26_CONFIG[prog26] || PROG26_CONFIG[''];
+    const pillHtml = `<span class="prog-pill" style="background:${pc.bg};color:${pc.color}">${pc.label}</span>`;
+
+    const fat24 = formatFat(c['2024']);
+    const fat25 = formatFat(c['2025']);
+    const fat26 = formatFat(c['2026']);
+
+    const vis26 = c['VISITA 2026'];
+    const visHtml = vis26 && vis26.toString().trim()
+      ? `<span class="visita-badge" style="background:var(--col-teal);display:inline-block" title="${vis26}">✓</span>`
+      : `<span class="visita-badge" style="background:var(--col-border-strong);display:inline-block" title="Da visitare">○</span>`;
+
+    tr.innerHTML = `
+      <td style="font-weight:600;max-width:160px" title="${c['CLIENTE'] || ''}">${truncate(c['CLIENTE'] || '—', 26)}</td>
+      <td>${c['CITTÀ'] || '—'}</td>
+      <td style="color:var(--col-text-muted)">${c['TIPO'] || '—'}</td>
+      <td style="color:var(--col-text-muted);font-size:12px">${c['NETWORK'] || '—'}</td>
+      <td>${pillHtml}</td>
+      <td class="fat-cell" style="color:${fatColor(c['2024'])}">${fat24}</td>
+      <td class="fat-cell" style="color:${fatColor(c['2025'])}">${fat25}</td>
+      <td class="fat-cell" style="color:${fatColor(c['2026'])}">${fat26}</td>
+      <td style="text-align:center">${visHtml}</td>
+    `;
+
+    tr.addEventListener('click', () => {
+      document.querySelectorAll('#client-tbody tr').forEach(r => r.classList.remove('selected'));
+      tr.classList.add('selected');
+      selectedIndex = i;
+      showDetail(c);
+    });
+
+    tbody.appendChild(tr);
+  });
+}
+
+// ─── DETAIL ───────────────────────────────────────────────────────
+function showDetail(c) {
+  document.getElementById('detail-empty').style.display = 'none';
+  const det = document.getElementById('detail-content');
+  det.classList.add('visible');
+  pendingEdits = {};
+
+  const initials = getInitials(c['CLIENTE'] || '?');
+  const prog26 = (c['PROG26'] || '').trim().toUpperCase();
+  const pc = PROG26_CONFIG[prog26] || PROG26_CONFIG[''];
+
+  const fat24 = numFat(c['2024']);
+  const fat25 = numFat(c['2025']);
+  const fat26 = numFat(c['2026']);
+  const maxFat = Math.max(fat24, fat25, fat26, 1);
+
+  const barH24 = Math.max(2, Math.round((fat24 / maxFat) * 36));
+  const barH25 = Math.max(2, Math.round((fat25 / maxFat) * 36));
+  const barH26 = Math.max(2, Math.round((fat26 / maxFat) * 36));
+
+  const waNum = (c['WHATSAPP'] || c['CELL'] || '').toString().replace(/\D/g,'');
+  const waLink = waNum ? `https://wa.me/39${waNum}` : null;
+
+  const visita26 = c['VISITA 2026'] || '';
+
+  det.innerHTML = `
+    <div class="detail-header">
+      <div class="avatar">${initials}</div>
+      <div style="flex:1;min-width:0">
+        <div class="detail-name">${c['CLIENTE'] || '—'}</div>
+        <div class="detail-meta">${c['TIPO'] || ''} ${c['TIPO'] && c['NETWORK'] ? '·' : ''} ${c['NETWORK'] || ''}</div>
+        <div style="margin-top:5px"><span class="prog-pill" style="background:${pc.bg};color:${pc.color}">${pc.label}</span></div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Fatturato</div>
+      <div class="fat-bars">
+        <div class="fat-bar-wrap">
+          <div class="fat-bar-val">${formatFat(c['2024'])}</div>
+          <div class="fat-bar" style="height:${barH24}px;background:var(--col-border-strong)"></div>
+          <div class="fat-bar-label">2024</div>
+        </div>
+        <div class="fat-bar-wrap">
+          <div class="fat-bar-val">${formatFat(c['2025'])}</div>
+          <div class="fat-bar" style="height:${barH25}px;background:var(--col-teal)"></div>
+          <div class="fat-bar-label">2025</div>
+        </div>
+        <div class="fat-bar-wrap">
+          <div class="fat-bar-val">${formatFat(c['2026'])}</div>
+          <div class="fat-bar" style="height:${barH26}px;background:${fat26 >= fat25 ? '#1D9E75' : '#E24B4A'}"></div>
+          <div class="fat-bar-label">2026</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Anagrafica</div>
+      ${fieldRow('Codice', c['COD.'] || '—', false)}
+      ${fieldRow('Città', (c['CITTÀ'] || '—') + (c['PR'] ? ` (${c['PR']})` : ''), false)}
+      ${fieldRow('Listino', c['LISTINO 26'] || '—', false)}
+      ${fieldRow('Range', c['RANGE'] || '—', false)}
+      ${fieldRow('Visita 2025', c['VISITA 2025'] || '—', false)}
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Contatti</div>
+      ${fieldRow('Nome', c['NOME'] || '—', false)}
+      ${fieldRow('Tel', c['TELEFONO'] || '—', false)}
+      ${fieldRow('Cell / WA', c['WHATSAPP'] || c['CELL'] || '—', false)}
+      ${fieldRow('Email', c['EMAIL'] || '—', false)}
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Strumenti</div>
+      ${fieldRow('Tool', c['TOOL'] || '—', false)}
+      ${fieldRow('Diagnosi', c['DIAGNOSI'] || '—', false)}
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Visita 2026</div>
+      <div class="field-row">
+        <span class="field-label">Data visita</span>
+        <input class="field-input" id="input-visita" type="text"
+          value="${visita26}" placeholder="gg/mm/aaaa"
+          onchange="onEdit('VISITA 2026', this.value)">
+      </div>
+      <div class="field-row">
+        <span class="field-label">Note</span>
+        <input class="field-input" id="input-note" type="text"
+          value="${c['NOTE'] || ''}" placeholder="Note…"
+          onchange="onEdit('NOTE', this.value)">
+      </div>
+    </div>
+
+    <div class="detail-actions">
+      ${waLink ? `<a class="action-btn green" href="${waLink}" target="_blank">💬 WhatsApp</a>` : ''}
+      <button class="action-btn" onclick="callClient('${c['TELEFONO'] || c['CELL'] || ''}')">📞 Chiama</button>
+      <button class="action-btn green" id="btn-save" onclick="saveEdits('${escJs(c['CLIENTE'])}', '${c['COD.'] || ''}')">💾 Salva</button>
+    </div>
+  `;
+
+  // store reference
+  det._currentClient = c;
+}
+
+function fieldRow(label, value, editable=false, key='') {
+  return `<div class="field-row">
+    <span class="field-label">${label}</span>
+    <span class="field-value">${value}</span>
+  </div>`;
+}
+
+function onEdit(key, value) {
+  pendingEdits[key] = value;
+  const btn = document.getElementById('btn-save');
+  if (btn) btn.style.background = '#faeeda';
+}
+
+// ─── SAVE (Google Sheets API) ──────────────────────────────────────
+async function saveEdits(clienteName, codice) {
+  if (Object.keys(pendingEdits).length === 0) {
+    showToast('Nessuna modifica da salvare.');
+    return;
+  }
+
+  showToast('Salvataggio...');
+
+  // Trova il cliente in allClients e aggiorna localmente
+  const idx = allClients.findIndex(c => c['CLIENTE'] === clienteName && c['COD.'] === codice);
+  if (idx >= 0) {
+    Object.assign(allClients[idx], pendingEdits);
+  }
+
+  // Aggiorna la riga nel Google Sheet via gviz/API
+  // Per la scrittura serve Google Sheets API v4 con OAuth o service account
+  // Qui mostriamo il flusso, l'API key va inserita sopra
+  const success = await writeToSheet(clienteName, codice, pendingEdits);
+
+  if (success) {
+    showToast('✓ Salvato su Google Sheet');
+    pendingEdits = {};
+    const btn = document.getElementById('btn-save');
+    if (btn) btn.style.background = '';
+    applyFilter();
+  } else {
+    showToast('⚠ Errore scrittura. Verifica accesso al foglio.');
+  }
+}
+
+async function writeToSheet(clienteName, codice, edits) {
+  try {
+    const rowIndex = allClients.findIndex(c => c['CLIENTE'] === clienteName && c['COD.'] === codice);
+    if (rowIndex < 0) { showToast('⚠ Cliente non trovato nel dataset.'); return false; }
+
+    const updates = Object.entries(edits).map(([col, value]) => ({ col, value }));
+
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ sheetName: SHEET_NAME, rowIndex, updates })
+    });
+    const json = await res.json();
+    return json.ok === true;
+  } catch(e) {
+    console.error('writeToSheet error:', e);
+    return false;
+  }
+}
+
+// ─── SIDEBAR COUNTS ───────────────────────────────────────────────
+function updateSidebarCounts() {
+  const count = (fn) => allClients.filter(fn).length;
+
+  const getP = (v) => (v['PROG26'] || '').trim().toUpperCase();
+
+  document.getElementById('cnt-all').textContent = allClients.length;
+  document.getElementById('cnt-workbox').textContent = count(c => getP(c) === 'WORKBOX');
+  document.getElementById('cnt-cat').textContent = count(c => getP(c) === 'CATALOGOSP');
+  document.getElementById('cnt-ok24').textContent = count(c => getP(c) === 'OK24NO25');
+  document.getElementById('cnt-ok25').textContent = count(c => getP(c) === 'OK25NOVIS');
+  document.getElementById('cnt-dorm').textContent = count(c => getP(c) === 'DORMIENTI');
+  document.getElementById('cnt-nonint').textContent = count(c => getP(c) === 'NONINT');
+  document.getElementById('cnt-active').textContent = count(c => !c['PROG26'] || c['PROG26'].trim() === '');
+
+  document.getElementById('cnt-vis-yes').textContent = count(c => c['VISITA 2026'] && c['VISITA 2026'].toString().trim() !== '');
+  document.getElementById('cnt-vis-no').textContent = count(c => !c['VISITA 2026'] || c['VISITA 2026'].toString().trim() === '');
+}
+
+function updateStats() {
+  const sum = (key) => allClients.reduce((a, c) => a + numFat(c[key]), 0);
+  const fat25 = sum('2025');
+  const fat26 = sum('2026');
+  const attivi = allClients.filter(c => numFat(c['2025']) > 0 || numFat(c['2026']) > 0).length;
+
+  document.getElementById('stat-fat25').textContent = formatK(fat25);
+  document.getElementById('stat-fat26').textContent = formatK(fat26);
+  document.getElementById('stat-attivi').textContent = attivi;
+}
+
+// ─── SIDEBAR CLICK ────────────────────────────────────────────────
+document.querySelectorAll('.sidebar-item').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.sidebar-item').forEach(e => e.classList.remove('active'));
+    el.classList.add('active');
+    currentFilter = el.dataset.filter;
+    const labels = {
+      'ALL': 'Tutti i clienti',
+      'WORKBOX': 'Top clienti — Workbox',
+      'CATALOGOSP': 'Catalogo Spring',
+      'OK24NO25': 'OK 2024, nessuna visita 2025',
+      'OK25NOVIS': 'OK 2025, da visitare',
+      'DORMIENTI': 'Clienti dormienti',
+      'NONINT': 'Non interessati',
+      'ACTIVE': 'Clienti attivi (nessun tag)',
+      'VISITA_YES': 'Visitati nel 2026',
+      'VISITA_NO': 'Da visitare nel 2026',
+    };
+    document.getElementById('current-filter-label').textContent = labels[currentFilter] || '';
+    applyFilter();
+  });
+});
+
+// ─── SEARCH & FILTERS ─────────────────────────────────────────────
+document.getElementById('search').addEventListener('input', applyFilter);
+document.getElementById('filter-tipo').addEventListener('change', applyFilter);
+document.getElementById('filter-network').addEventListener('change', applyFilter);
+document.getElementById('filter-prov').addEventListener('change', applyFilter);
+
+document.getElementById('btn-sync').addEventListener('click', () => {
+  document.getElementById('loading-overlay').style.display = 'flex';
+  document.getElementById('loading-overlay').querySelector('span').textContent = 'Aggiornamento...';
+  loadData();
+});
+
+// ─── AI ASSISTANT ─────────────────────────────────────────────────
+function toggleAI() {
+  document.getElementById('ai-panel').classList.toggle('open');
+}
+
+async function sendAI() {
+  const inp = document.getElementById('ai-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+
+  aiMessages.push({ role: 'user', content: text });
+  renderAIMessages();
+
+  // Contesto clienti correnti
+  const context = buildAIContext(text);
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        system: `Sei l'assistente CRM di Stefano, agente commerciale MAK 2026 (gomme/cerchi).
+Province: Milano, Monza-Brianza, Lodi.
+Clienti totali: ${allClients.length}. Attualmente filtrati: ${filteredClients.length}.
+Rispondi in italiano, diretto e pratico. Conosci: listini, provvigioni, network (ASCONAUTO, FIRST STOP, DRIVER), PROG26 segmentazione, ruotini, TPMS, Tool8.
+${context}`,
+        messages: aiMessages.filter(m => m.role !== 'assistant' || m !== aiMessages[0])
+      })
+    });
+
+    const data = await res.json();
+    const reply = data.content?.[0]?.text || 'Errore risposta AI.';
+    aiMessages.push({ role: 'assistant', content: reply });
+    renderAIMessages();
+  } catch(e) {
+    aiMessages.push({ role: 'assistant', content: 'Errore connessione. Riprova.' });
+    renderAIMessages();
+  }
+}
+
+function buildAIContext(query) {
+  const det = document.getElementById('detail-content');
+  const currentClient = det._currentClient;
+  let ctx = '';
+
+  if (currentClient) {
+    ctx += `\nCliente selezionato: ${currentClient['CLIENTE']}, ${currentClient['TIPO']}, ${currentClient['CITTÀ']}, fat25: ${currentClient['2025']}, fat26: ${currentClient['2026']}, prog26: ${currentClient['PROG26']}.`;
+  }
+
+  // Stats sintetiche
+  const workbox = allClients.filter(c => (c['PROG26']||'').trim().toUpperCase() === 'WORKBOX').length;
+  ctx += `\nSegmenti: Workbox=${workbox}, totale=${allClients.length}.`;
+
+  return ctx;
+}
+
+function renderAIMessages() {
+  const container = document.getElementById('ai-messages');
+  container.innerHTML = '';
+  aiMessages.forEach(m => {
+    const div = document.createElement('div');
+    div.className = `ai-msg ${m.role}`;
+    div.textContent = m.content;
+    container.appendChild(div);
+  });
+  container.scrollTop = container.scrollHeight;
+}
+
+// ─── UTILS ────────────────────────────────────────────────────────
+function formatFat(v) {
+  const n = numFat(v);
+  if (!n) return '—';
+  return '€' + Math.round(n).toLocaleString('it-IT');
+}
+
+function numFat(v) {
+  if (!v) return 0;
+  const n = parseFloat(v.toString().replace(',', '.'));
+  return isNaN(n) ? 0 : n;
+}
+
+function fatColor(v) {
+  const n = numFat(v);
+  if (!n) return 'var(--col-text-faint)';
+  if (n >= 10000) return 'var(--col-teal-dark)';
+  if (n >= 3000) return 'var(--col-text)';
+  return 'var(--col-amber)';
+}
+
+function formatK(n) {
+  if (n >= 1000000) return '€' + (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000) return '€' + Math.round(n/1000) + 'K';
+  return '€' + Math.round(n);
+}
+
+function truncate(s, n) {
+  return s.length > n ? s.slice(0, n) + '…' : s;
+}
+
+function getInitials(name) {
+  return name.split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+}
+
+function escJs(s) {
+  return (s||'').replace(/'/g, "\\'").replace(/"/g, '\\"');
+}
+
+function callClient(tel) {
+  if (tel) window.location.href = 'tel:' + tel;
+}
+
+function showToast(msg, duration=3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>
