@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MAK 2026 — CRM</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   :root {
     --col-bg: #1a1d23;
@@ -559,6 +561,65 @@
   }
   #toast.show { opacity: 1; }
 
+  /* AUTH */
+  #auth-overlay {
+    position: fixed; inset: 0;
+    background: var(--col-sidebar);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+  }
+  #auth-overlay.hidden { display: none; }
+
+  #auth-box {
+    background: #1e2028;
+    border-radius: var(--radius-lg);
+    padding: 32px 28px;
+    width: 280px;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  #auth-box .logo {
+    font-size: 22px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+  #auth-box .logo span { color: var(--col-teal); }
+
+  .auth-sub {
+    font-size: 12px;
+    color: #9aa0b0;
+    margin-bottom: 18px;
+    line-height: 1.4;
+  }
+
+  #auth-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #2a2d36;
+    border-radius: var(--radius);
+    background: #13151a;
+    color: #e0e3ea;
+    font-size: 14px;
+    outline: none;
+    margin-bottom: 10px;
+    text-align: center;
+  }
+  #auth-input:focus { border-color: var(--col-teal); }
+
+  #auth-submit { width: 100%; }
+
+  #auth-error {
+    display: none;
+    color: var(--col-red);
+    font-size: 12px;
+    margin-top: 10px;
+  }
+  #auth-error.show { display: block; }
+
   /* LOADING */
   #loading-overlay {
     position: fixed; inset: 0;
@@ -590,6 +651,76 @@
     display: none;
   }
   #dashboard-view.visible { display: block; }
+
+  /* MAPPA */
+  #map-view {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #map-view.visible { display: flex; }
+  #map-view .dash-topbar {
+    padding: 16px 20px 0;
+    margin-bottom: 12px;
+  }
+  #map-legend {
+    padding: 0 20px 12px;
+    flex-shrink: 0;
+  }
+  .map-legend-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .map-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 14px;
+    border: 1px solid var(--col-border);
+    background: var(--col-surface);
+    color: var(--col-text);
+    cursor: pointer;
+    user-select: none;
+    transition: opacity 0.12s;
+  }
+  .map-legend-item .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .map-legend-item.off { opacity: 0.35; }
+  #map-container {
+    flex: 1;
+    min-height: 0;
+  }
+  .map-popup-name { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+  .map-popup-meta { font-size: 11px; color: #666; margin-bottom: 6px; }
+  .map-popup-pill {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-bottom: 6px;
+  }
+  .map-popup-fat { font-size: 11px; margin-bottom: 8px; color: var(--col-text); }
+  .map-popup-btn {
+    width: 100%;
+    padding: 6px;
+    border: none;
+    border-radius: 6px;
+    background: var(--col-teal);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .map-popup-btn:hover { background: var(--col-teal-dark); }
 
   .dash-topbar {
     display: flex;
@@ -815,6 +946,11 @@
     .dash-section { padding: 12px; }
     .bar-label { width: 80px; font-size: 11px; }
     .dash-table { font-size: 11px; }
+
+    /* Mappa */
+    #map-view .dash-topbar { padding: 12px 12px 0; }
+    #map-legend { padding: 0 12px 10px; }
+    .map-legend-item { font-size: 11px; padding: 4px 8px; }
   }
 
   @media (max-width: 480px) {
@@ -825,6 +961,16 @@
 </style>
 </head>
 <body>
+
+<div id="auth-overlay">
+  <div id="auth-box">
+    <div class="logo">MAK<span>2026</span></div>
+    <div class="auth-sub">Area riservata — inserisci la password</div>
+    <input id="auth-input" type="password" placeholder="Password" autocomplete="off">
+    <button id="auth-submit" class="btn btn-primary">Entra</button>
+    <div id="auth-error">Password errata, riprova.</div>
+  </div>
+</div>
 
 <div id="loading-overlay">
   <div class="spinner"></div>
@@ -846,6 +992,10 @@
     <div class="nav-main-item" data-view="dashboard" id="nav-dashboard">
       <span class="icon">📊</span>
       Dashboard
+    </div>
+    <div class="nav-main-item" data-view="mappe" id="nav-mappe">
+      <span class="icon">📍</span>
+      Mappe
     </div>
   </div>
 
@@ -991,6 +1141,20 @@
       </div>
     </div>
   </div>
+
+  <div id="map-view">
+    <div class="dash-topbar">
+      <button class="hamburger-btn-mobile" aria-label="Menu">☰</button>
+      <div style="flex:1">
+        <div class="dash-title">Mappa clienti</div>
+        <div class="dash-subtitle" id="map-status">—</div>
+      </div>
+    </div>
+    <div id="map-legend">
+      <div class="map-legend-items" id="map-legend-items"></div>
+    </div>
+    <div id="map-container"></div>
+  </div>
 </div>
 
 <div id="toast"></div>
@@ -1000,6 +1164,41 @@
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxGvKAOk__h_I4vb-v6mibM1Iepgy9KYBgZYFktbcA0LZ2E5ae_pCuJAIMh8J5h3J177g/exec';
 const SHEET_NAME = 'Clienti';
 
+// ─── AUTH (protezione base lato client) ───────────────────────────
+// Cambia questa password con quella che vuoi usare tu.
+const ACCESS_PASSWORD = 'mak2026';
+
+(function initAuth() {
+  const overlay = document.getElementById('auth-overlay');
+  const input = document.getElementById('auth-input');
+  const errorEl = document.getElementById('auth-error');
+
+  function unlock() {
+    overlay.classList.add('hidden');
+    loadData();
+  }
+
+  if (localStorage.getItem('mak_auth') === 'ok') {
+    unlock();
+    return;
+  }
+
+  function tryAuth() {
+    if (input.value === ACCESS_PASSWORD) {
+      localStorage.setItem('mak_auth', 'ok');
+      unlock();
+    } else {
+      errorEl.classList.add('show');
+      input.value = '';
+      input.focus();
+    }
+  }
+
+  document.getElementById('auth-submit').addEventListener('click', tryAuth);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') tryAuth(); });
+  input.focus();
+})();
+
 // ─── STATE ────────────────────────────────────────────────────────
 let allClients = [];
 let filteredClients = [];
@@ -1007,6 +1206,19 @@ let currentFilter = 'ALL';
 let selectedIndex = null;
 let selectedRow = null;
 let pendingEdits = {};
+
+// Mappa
+let mapInstance = null;
+let mapLayers = {};
+let geocodeCache = null;
+let geocodingInProgress = false;
+const GEOCODE_CACHE_KEY = 'mak_geocache_v2';
+// Sulla mappa mostriamo solo i clienti da "lavorare": non interessati,
+// in calo, dormienti e senza visita
+const MAP_PROG26_KEYS = ['NONINT', 'OK24NO25', 'OK25NOVIS', 'DORMIENTI'];
+function mapClients() {
+  return allClients.filter(c => MAP_PROG26_KEYS.includes((c['PROG26'] || '').trim().toUpperCase()));
+}
 
 // ─── PROG26 CONFIG ────────────────────────────────────────────────
 const PROG26_CONFIG = {
@@ -1577,6 +1789,191 @@ function renderDashboard() {
   `).join('') || '<tr><td colspan="5" style="color:var(--col-text-faint);text-align:center;padding:16px">Nessun cliente in calo</td></tr>';
 }
 
+// ─── MAPPA ──────────────────────────────────────────────────────────
+function loadGeocodeCache() {
+  try { return JSON.parse(localStorage.getItem(GEOCODE_CACHE_KEY) || '{}'); } catch(e) { return {}; }
+}
+function saveGeocodeCache() {
+  try { localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(geocodeCache)); } catch(e) {}
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Offset deterministico (basato sul codice cliente) per separare visivamente
+// clienti con lo stesso indirizzo geocodificato — entro ~80m
+function hashOffset(str) {
+  let h = 0;
+  const s = (str || '').toString();
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  const angle = (h % 360) * Math.PI / 180;
+  const r = 0.0001 + (h % 1000) / 1000 * 0.0006;
+  return { dx: Math.cos(angle) * r, dy: Math.sin(angle) * r };
+}
+
+// Costruisce query e chiave cache per la geocodifica basata sull'indirizzo completo
+function buildGeoQuery(c) {
+  const citta = (c['CITTÀ'] || '').trim();
+  if (!citta) return null;
+  const indirizzo = (c['INDIRIZZO'] || '').trim();
+  const cap = (c['CAP'] || '').toString().trim();
+  const pr = (c['PR'] || '').trim();
+
+  const parts = [];
+  if (indirizzo) parts.push(indirizzo);
+  if (cap) parts.push(cap);
+  parts.push(citta);
+  if (pr) parts.push(pr);
+  parts.push('Italia');
+
+  return {
+    cacheKey: parts.join('|').toUpperCase(),
+    query: parts.join(', ')
+  };
+}
+
+function initMapView() {
+  if (mapInstance) return;
+
+  mapInstance = L.map('map-container', { preferCanvas: true }).setView([45.50, 9.30], 10);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18,
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(mapInstance);
+
+  Object.keys(PROG26_CONFIG).forEach(key => {
+    if (MAP_PROG26_KEYS.includes(key)) {
+      mapLayers[key] = L.layerGroup().addTo(mapInstance);
+    }
+  });
+
+  renderMapLegend();
+  geocodeCache = loadGeocodeCache();
+  startGeocoding();
+}
+
+function renderMapLegend() {
+  const counts = {};
+  mapClients().forEach(c => {
+    const key = (c['PROG26'] || '').trim().toUpperCase();
+    counts[key] = (counts[key] || 0) + 1;
+  });
+
+  document.getElementById('map-legend-items').innerHTML = MAP_PROG26_KEYS.map(key => {
+    const pc = PROG26_CONFIG[key];
+    const n = counts[key] || 0;
+    return `<div class="map-legend-item" data-key="${key}" onclick="toggleMapLayer('${key}', this)">
+      <span class="dot" style="background:${pc.color}"></span>${pc.label} (${n})
+    </div>`;
+  }).join('');
+}
+
+function toggleMapLayer(key, el) {
+  const layer = mapLayers[key];
+  if (!layer || !mapInstance) return;
+  if (mapInstance.hasLayer(layer)) {
+    mapInstance.removeLayer(layer);
+    el.classList.add('off');
+  } else {
+    mapInstance.addLayer(layer);
+    el.classList.remove('off');
+  }
+}
+
+function buildMapPopup(c, pc) {
+  return `
+    <div class="map-popup-name">${c['CLIENTE'] || '—'}</div>
+    <div class="map-popup-meta">${c['TIPO'] || ''} ${c['TIPO'] && c['NETWORK'] ? '·' : ''} ${c['NETWORK'] || ''} — ${c['CITTÀ'] || ''}</div>
+    <div class="map-popup-pill" style="background:${pc.bg};color:${pc.color}">${pc.label}</div>
+    <div class="map-popup-fat">Fat. 2025: <strong>${formatFat(c['2025'])}</strong> · 2026: <strong>${formatFat(c['2026'])}</strong></div>
+    <button class="map-popup-btn" onclick="goToClient('${escJs(c['COD.'])}')">Apri scheda</button>
+  `;
+}
+
+function plotClients(clients, baseCoords) {
+  clients.forEach(c => {
+    const key = (c['PROG26'] || '').trim().toUpperCase();
+    if (!mapLayers[key]) return;
+    const pc = PROG26_CONFIG[key] || PROG26_CONFIG[''];
+    const off = hashOffset(c['COD.'] || c['CLIENTE'] || '');
+    const lat = baseCoords.lat + off.dy;
+    const lng = baseCoords.lng + off.dx;
+
+    const marker = L.circleMarker([lat, lng], {
+      radius: 6,
+      color: '#fff',
+      weight: 1.5,
+      fillColor: pc.color,
+      fillOpacity: 0.85
+    });
+    marker.bindPopup(buildMapPopup(c, pc));
+    marker.addTo(mapLayers[key]);
+  });
+}
+
+async function geocodeQuery(query) {
+  try {
+    const q = encodeURIComponent(query);
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`);
+    const data = await res.json();
+    if (data && data[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+  } catch(e) {}
+  return null;
+}
+
+function updateMapStatus(remaining, total) {
+  const el = document.getElementById('map-status');
+  if (!el) return;
+  const clients = mapClients();
+  if (remaining > 0) {
+    el.textContent = `Geocoding indirizzi in corso… ${total - remaining}/${total} indirizzi (una tantum, poi resta in memoria su questo dispositivo)`;
+  } else {
+    const plotted = clients.filter(c => (c['CITTÀ']||'').trim()).length;
+    el.textContent = `${plotted} clienti da lavorare mappati su ${clients.length} totali`;
+  }
+}
+
+async function startGeocoding() {
+  // Raggruppa per indirizzo completo (via, CAP, città, prov) — solo segmenti da mappare
+  const addrMap = {};
+  mapClients().forEach(c => {
+    const geo = buildGeoQuery(c);
+    if (!geo) return;
+    if (!addrMap[geo.cacheKey]) addrMap[geo.cacheKey] = { query: geo.query, clients: [] };
+    addrMap[geo.cacheKey].clients.push(c);
+  });
+
+  const toGeocode = [];
+  Object.entries(addrMap).forEach(([key, group]) => {
+    if (geocodeCache[key]) {
+      plotClients(group.clients, geocodeCache[key]);
+    } else {
+      toGeocode.push([key, group]);
+    }
+  });
+
+  updateMapStatus(toGeocode.length, toGeocode.length);
+
+  if (toGeocode.length === 0 || geocodingInProgress) {
+    if (toGeocode.length === 0) updateMapStatus(0, 0);
+    return;
+  }
+  geocodingInProgress = true;
+
+  for (let i = 0; i < toGeocode.length; i++) {
+    const [key, group] = toGeocode[i];
+    const coords = await geocodeQuery(group.query);
+    if (coords) {
+      geocodeCache[key] = coords;
+      saveGeocodeCache();
+      plotClients(group.clients, coords);
+    }
+    updateMapStatus(toGeocode.length - i - 1, toGeocode.length);
+    await sleep(1100);
+  }
+  geocodingInProgress = false;
+  updateMapStatus(0, toGeocode.length);
+}
+
 function goToClient(codice) {
   // Torna alla vista clienti
   document.querySelectorAll('.nav-main-item').forEach(e => e.classList.remove('active'));
@@ -1584,6 +1981,7 @@ function goToClient(codice) {
   document.getElementById('topbar').style.display = 'flex';
   document.getElementById('content').style.display = 'flex';
   document.getElementById('dashboard-view').classList.remove('visible');
+  document.getElementById('map-view').classList.remove('visible');
 
   // Reset filtri e cerca per codice
   currentFilter = 'ALL';
@@ -1623,21 +2021,22 @@ document.querySelectorAll('.sidebar-item').forEach(el => {
   });
 });
 
-// ─── NAV VIEW SWITCH (Clienti / Dashboard) ────────────────────────
+// ─── NAV VIEW SWITCH (Clienti / Dashboard / Mappe) ─────────────────
 document.querySelectorAll('.nav-main-item').forEach(el => {
   el.addEventListener('click', () => {
     document.querySelectorAll('.nav-main-item').forEach(e => e.classList.remove('active'));
     el.classList.add('active');
     const view = el.dataset.view;
-    if (view === 'dashboard') {
-      document.getElementById('topbar').style.display = 'none';
-      document.getElementById('content').style.display = 'none';
-      document.getElementById('dashboard-view').classList.add('visible');
-      renderDashboard();
-    } else {
-      document.getElementById('topbar').style.display = 'flex';
-      document.getElementById('content').style.display = 'flex';
-      document.getElementById('dashboard-view').classList.remove('visible');
+
+    document.getElementById('topbar').style.display = (view === 'clienti') ? 'flex' : 'none';
+    document.getElementById('content').style.display = (view === 'clienti') ? 'flex' : 'none';
+    document.getElementById('dashboard-view').classList.toggle('visible', view === 'dashboard');
+    document.getElementById('map-view').classList.toggle('visible', view === 'mappe');
+
+    if (view === 'dashboard') renderDashboard();
+    if (view === 'mappe') {
+      initMapView();
+      setTimeout(() => { if (mapInstance) mapInstance.invalidateSize(); }, 50);
     }
     closeSidebar();
   });
@@ -1729,8 +2128,6 @@ function closeDetail() {
   document.getElementById('detail-panel').classList.remove('open');
 }
 
-// ─── INIT ─────────────────────────────────────────────────────────
-loadData();
 </script>
 </body>
 </html>
