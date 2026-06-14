@@ -1914,10 +1914,13 @@ function plotClients(clients, baseCoords) {
 }
 
 async function geocodeQuery(query) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
   try {
     const q = encodeURIComponent(query);
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
     if (!res.ok) {
       console.warn('Geocode HTTP', res.status, query);
       geoFailCount++;
@@ -1931,7 +1934,9 @@ async function geocodeQuery(query) {
     console.warn('Geocode: nessun risultato per', query);
     geoFailCount++;
   } catch(e) {
-    console.error('Geocode errore fetch:', e, 'query:', query);
+    clearTimeout(timeoutId);
+    if (e.name === 'AbortError') console.warn('Geocode timeout per', query);
+    else console.error('Geocode errore fetch:', e, 'query:', query);
     geoFailCount++;
   }
   return null;
