@@ -429,6 +429,27 @@
   }
   .field-input:focus { border-color: var(--col-teal); background: #fff; }
 
+  .product-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 12px;
+  }
+  .product-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    font-size: 12px;
+    border-bottom: 1px solid var(--col-border);
+    gap: 6px;
+  }
+  .product-grid .product-item:nth-last-child(-n+2) { border-bottom: none; }
+  .product-label { color: var(--col-text-muted); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .product-date { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
+  .product-date.recent { color: var(--col-teal-dark); }
+  .product-date.old { color: var(--col-text-muted); font-weight: 600; }
+  .product-date.never { color: var(--col-text-faint); font-weight: 500; }
+
   .fat-bars {
     display: flex;
     gap: 6px;
@@ -892,6 +913,58 @@ const PROG26_CONFIG = {
   '':           { label: 'Attivo',       bg: '#E1F5EE', color: '#0F6E56' },
 };
 
+// ─── PRODOTTI / ULTIMO ACQUISTO ────────────────────────────────────
+const PRODUCT_CATEGORIES = [
+  { key: 'LEGA',        label: 'Lega' },
+  { key: 'ACCIAIO',     label: 'Acciaio' },
+  { key: 'CALZE',       label: 'Calze' },
+  { key: 'CATENE',      label: 'Catene' },
+  { key: 'NPK',         label: 'NPK' },
+  { key: 'TPMS',        label: 'TPMS' },
+  { key: 'FORD',        label: 'Ford' },
+  { key: 'PNEUMATICO',  label: 'Pneumatico' },
+  { key: 'CORA',        label: 'Cora' },
+  { key: 'INGERSOLL',   label: 'Ingersoll' },
+  { key: '1MO ORDINE',  label: '1° Ordine' },
+];
+
+// Converte un valore cella (data ISO, dd/MM/yyyy, "NO", 0, vuoto) in oggetto Date o null
+function parseDateVal(v) {
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'number') return null;
+  const s = v.toString().trim();
+  if (!s || s.toUpperCase() === 'NO') return null;
+
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+
+  return null;
+}
+
+// Restituisce la data più recente tra le colonne "<KEY> 24" e "<KEY> 25"
+function lastPurchaseDate(c, key) {
+  const d24 = parseDateVal(c[key + ' 24']);
+  const d25 = parseDateVal(c[key + ' 25']);
+  if (d24 && d25) return d24 > d25 ? d24 : d25;
+  return d24 || d25 || null;
+}
+
+function formatDateDisplay(d) {
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
+// Considera "recente" un acquisto negli ultimi 12 mesi
+function isRecent(d) {
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  return d >= oneYearAgo;
+}
+
 // ─── LOAD DATA ────────────────────────────────────────────────────
 function loadData() {
   const overlay = document.getElementById('loading-overlay');
@@ -1058,6 +1131,7 @@ function showDetail(c) {
   const waLink = waNum ? `https://wa.me/39${waNum}` : null;
 
   const visita26 = c['VISITA 2026'] || '';
+  const nVisite = c['N. VISITE'] || '';
 
   det.innerHTML = `
     <div class="detail-header">
@@ -1092,19 +1166,15 @@ function showDetail(c) {
 
     <div class="detail-section">
       <div class="detail-section-title">Anagrafica</div>
-      ${fieldRow('Codice', c['COD.'] || '—', false)}
-      ${fieldRow('Città', (c['CITTÀ'] || '—') + (c['PR'] ? ` (${c['PR']})` : ''), false)}
       ${fieldRow('Listino', c['LISTINO 26'] || '—', false)}
       ${fieldRow('Range', c['RANGE'] || '—', false)}
-      ${fieldRow('Visita 2025', c['VISITA 2025'] || '—', false)}
+      ${fieldRow('Nome', c['NOME'] || '—', false)}
     </div>
 
     <div class="detail-section">
-      <div class="detail-section-title">Contatti</div>
-      ${fieldRow('Nome', c['NOME'] || '—', false)}
-      ${fieldRow('Tel', c['TELEFONO'] || '—', false)}
-      ${fieldRow('Cell / WA', c['WHATSAPP'] || c['CELL'] || '—', false)}
-      ${fieldRow('Email', c['EMAIL'] || '—', false)}
+      <div class="detail-section-title">Credenziali B2B</div>
+      ${fieldRow('ID Utente', c['ID'] || '—', false)}
+      ${fieldRow('PWD', c['PWD'] || '—', false)}
     </div>
 
     <div class="detail-section">
@@ -1114,9 +1184,16 @@ function showDetail(c) {
     </div>
 
     <div class="detail-section">
-      <div class="detail-section-title">Visita 2026</div>
+      <div class="detail-section-title">Visite</div>
+      ${fieldRow('Visita 2025', c['VISITA 2025'] || '—', false)}
       <div class="field-row">
-        <span class="field-label">Data visita</span>
+        <span class="field-label">N. Visita</span>
+        <input class="field-input" id="input-nvisite" type="text"
+          value="${nVisite}" placeholder="0"
+          onchange="onEdit('N. VISITE', this.value)">
+      </div>
+      <div class="field-row">
+        <span class="field-label">Data visita 26</span>
         <input class="field-input" id="input-visita" type="text"
           value="${visita26}" placeholder="gg/mm/aaaa"
           onchange="onEdit('VISITA 2026', this.value)">
@@ -1126,6 +1203,21 @@ function showDetail(c) {
         <input class="field-input" id="input-note" type="text"
           value="${c['NOTE'] || ''}" placeholder="Note…"
           onchange="onEdit('NOTE', this.value)">
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Prodotti — Ultimo acquisto</div>
+      <div class="product-grid">
+        ${PRODUCT_CATEGORIES.map(p => {
+          const d = lastPurchaseDate(c, p.key);
+          const display = d ? formatDateDisplay(d) : '—';
+          const cls = !d ? 'never' : (isRecent(d) ? 'recent' : 'old');
+          return `<div class="product-item">
+            <span class="product-label">${p.label}</span>
+            <span class="product-date ${cls}">${display}</span>
+          </div>`;
+        }).join('')}
       </div>
     </div>
 
@@ -1313,15 +1405,18 @@ function renderDashboard() {
     </div>`;
   }).join('');
 
-  // ── Provincia ──
+  // ── Provincia (solo MI, MB, LO) ──
+  const PROV_LIST = ['MI', 'MB', 'LO'];
   const provGroups = {};
+  PROV_LIST.forEach(p => provGroups[p] = { count: 0, fat26: 0 });
   allClients.forEach(c => {
-    const key = (c['PR'] || '').trim() || '(n.d.)';
-    if (!provGroups[key]) provGroups[key] = { count: 0, fat26: 0 };
-    provGroups[key].count++;
-    provGroups[key].fat26 += numFat(c['2026']);
+    const key = (c['PR'] || '').trim().toUpperCase();
+    if (provGroups[key]) {
+      provGroups[key].count++;
+      provGroups[key].fat26 += numFat(c['2026']);
+    }
   });
-  const provEntries = Object.entries(provGroups).sort((a, b) => b[1].count - a[1].count);
+  const provEntries = PROV_LIST.map(p => [p, provGroups[p]]);
   const maxProvCount = Math.max(...provEntries.map(e => e[1].count), 1);
   document.getElementById('dash-provincia').innerHTML = provEntries.map(([key, val], i) => {
     const pct = Math.round((val.count / maxProvCount) * 100);
