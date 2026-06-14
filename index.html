@@ -1370,7 +1370,7 @@ function applyFilter() {
     if (prov && c['PR'] !== prov) return false;
 
     if (q) {
-      const hay = [c['CLIENTE'], c['CITTÀ'], c['COD.'], c['NOME'], c['TELEFONO']].join(' ').toLowerCase();
+      const hay = [c['CLIENTE'], c["CITTA'"], c['COD.'], c['NOME'], c['TELEFONO']].join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -1404,7 +1404,7 @@ function renderTable() {
 
     tr.innerHTML = `
       <td style="font-weight:600;max-width:160px" title="${c['CLIENTE'] || ''}">${truncate(c['CLIENTE'] || '—', 26)}</td>
-      <td>${c['CITTÀ'] || '—'}</td>
+      <td>${c["CITTA'"] || '—'}</td>
       <td style="color:var(--col-text-muted)">${c['TIPO'] || '—'}</td>
       <td style="color:var(--col-text-muted);font-size:12px">${c['NETWORK'] || '—'}</td>
       <td>${pillHtml}</td>
@@ -1766,7 +1766,7 @@ function renderDashboard() {
   document.querySelector('#dash-top-clienti tbody').innerHTML = topClienti.map(c => `
     <tr onclick="goToClient('${escJs(c['COD.'])}')">
       <td>${truncate(c['CLIENTE'] || '—', 28)}</td>
-      <td style="color:var(--col-text-muted)">${c['CITTÀ'] || '—'}</td>
+      <td style="color:var(--col-text-muted)">${c["CITTA'"] || '—'}</td>
       <td class="num">${formatFat(c['2025'])}</td>
       <td class="num pos">${formatFat(c['2026'])}</td>
     </tr>
@@ -1781,7 +1781,7 @@ function renderDashboard() {
   document.querySelector('#dash-calo-clienti tbody').innerHTML = caloClienti.map(({c, delta}) => `
     <tr onclick="goToClient('${escJs(c['COD.'])}')">
       <td>${truncate(c['CLIENTE'] || '—', 26)}</td>
-      <td style="color:var(--col-text-muted)">${c['CITTÀ'] || '—'}</td>
+      <td style="color:var(--col-text-muted)">${c["CITTA'"] || '—'}</td>
       <td class="num">${formatFat(c['2025'])}</td>
       <td class="num">${formatFat(c['2026'])}</td>
       <td class="num neg">${formatFat(delta)}</td>
@@ -1812,7 +1812,7 @@ function hashOffset(str) {
 
 // Costruisce query e chiave cache per la geocodifica basata sull'indirizzo completo
 function buildGeoQuery(c) {
-  const citta = (c['CITTÀ'] || '').trim();
+  const citta = (c["CITTA'"] || '').trim();
   if (!citta) return null;
   const indirizzo = (c['INDIRIZZO'] || '').trim();
   const cap = (c['CAP'] || '').toString().trim();
@@ -1882,7 +1882,7 @@ function toggleMapLayer(key, el) {
 function buildMapPopup(c, pc) {
   return `
     <div class="map-popup-name">${c['CLIENTE'] || '—'}</div>
-    <div class="map-popup-meta">${c['TIPO'] || ''} ${c['TIPO'] && c['NETWORK'] ? '·' : ''} ${c['NETWORK'] || ''} — ${c['CITTÀ'] || ''}</div>
+    <div class="map-popup-meta">${c['TIPO'] || ''} ${c['TIPO'] && c['NETWORK'] ? '·' : ''} ${c['NETWORK'] || ''} — ${c["CITTA'"] || ''}</div>
     <div class="map-popup-pill" style="background:${pc.bg};color:${pc.color}">${pc.label}</div>
     <div class="map-popup-fat">Fat. 2025: <strong>${formatFat(c['2025'])}</strong> · 2026: <strong>${formatFat(c['2026'])}</strong></div>
     <button class="map-popup-btn" onclick="goToClient('${escJs(c['COD.'])}')">Apri scheda</button>
@@ -1927,7 +1927,7 @@ function updateMapStatus(remaining, total) {
   if (remaining > 0) {
     el.textContent = `Geocoding indirizzi in corso… ${total - remaining}/${total} indirizzi (una tantum, poi resta in memoria su questo dispositivo)`;
   } else {
-    const plotted = clients.filter(c => (c['CITTÀ']||'').trim()).length;
+    const plotted = clients.filter(c => (c["CITTA'"]||'').trim()).length;
     el.textContent = `${plotted} clienti da lavorare mappati su ${clients.length} totali`;
   }
 }
