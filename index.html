@@ -1149,6 +1149,7 @@
         <div class="dash-title">Mappa clienti</div>
         <div class="dash-subtitle" id="map-status">—</div>
       </div>
+      <button class="btn btn-primary" id="btn-map-retry">⟳ Riprova</button>
     </div>
     <div id="map-legend">
       <div class="map-legend-items" id="map-legend-items"></div>
@@ -1212,6 +1213,8 @@ let mapInstance = null;
 let mapLayers = {};
 let geocodeCache = null;
 let geocodingInProgress = false;
+let geoOkCount = 0;
+let geoFailCount = 0;
 const GEOCODE_CACHE_KEY = 'mak_geocache_v2';
 // Sulla mappa mostriamo solo i clienti da "lavorare": non interessati,
 // in calo, dormienti e senza visita
@@ -1913,10 +1916,24 @@ function plotClients(clients, baseCoords) {
 async function geocodeQuery(query) {
   try {
     const q = encodeURIComponent(query);
-    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`);
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.warn('Geocode HTTP', res.status, query);
+      geoFailCount++;
+      return null;
+    }
     const data = await res.json();
-    if (data && data[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-  } catch(e) {}
+    if (data && data[0]) {
+      geoOkCount++;
+      return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    }
+    console.warn('Geocode: nessun risultato per', query);
+    geoFailCount++;
+  } catch(e) {
+    console.error('Geocode errore fetch:', e, 'query:', query);
+    geoFailCount++;
+  }
   return null;
 }
 
@@ -1925,7 +1942,9 @@ function updateMapStatus(remaining, total) {
   if (!el) return;
   const clients = mapClients();
   if (remaining > 0) {
-    el.textContent = `Geocoding indirizzi in corso… ${total - remaining}/${total} indirizzi (una tantum, poi resta in memoria su questo dispositivo)`;
+    el.textContent = `Geocoding in corso… ${total - remaining}/${total} indirizzi (ok: ${geoOkCount}, falliti: ${geoFailCount})`;
+  } else if (total > 0 && geoOkCount === 0 && geoFailCount > 0) {
+    el.textContent = `⚠ Geocoding fallito per tutti gli indirizzi (${geoFailCount}). Il servizio potrebbe essere temporaneamente bloccato — premi "Riprova" più tardi.`;
   } else {
     const plotted = clients.filter(c => (c["CITTA'"]||'').trim()).length;
     el.textContent = `${plotted} clienti da lavorare mappati su ${clients.length} totali`;
@@ -1973,6 +1992,21 @@ async function startGeocoding() {
   geocodingInProgress = false;
   updateMapStatus(0, toGeocode.length);
 }
+
+function retryGeocoding() {
+  if (geocodingInProgress) {
+    showToast('Geocoding già in corso…');
+    return;
+  }
+  if (!mapInstance) return;
+  geoOkCount = 0;
+  geoFailCount = 0;
+  // Svuota i layer esistenti per evitare pin duplicati
+  Object.values(mapLayers).forEach(layer => layer.clearLayers());
+  startGeocoding();
+}
+
+document.getElementById('btn-map-retry').addEventListener('click', retryGeocoding);
 
 function goToClient(codice) {
   // Torna alla vista clienti
