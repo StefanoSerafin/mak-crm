@@ -135,6 +135,24 @@
   }
   .stat-mini strong { color: #9aa0b0; }
 
+  /* NAV MAIN (Clienti / Dashboard) */
+  .nav-main-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: #9aa0b0;
+    transition: background 0.12s, color 0.12s;
+    user-select: none;
+  }
+  .nav-main-item:hover { background: #1e2028; color: #d0d4de; }
+  .nav-main-item.active { background: var(--col-teal); color: #ffffff; }
+  .nav-main-item .icon { font-size: 14px; width: 18px; text-align: center; }
+
   /* MAIN */
   #main {
     flex: 1;
@@ -511,88 +529,174 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* AI Panel */
-  #ai-panel {
-    position: fixed;
-    right: 24px;
-    bottom: 24px;
-    width: 340px;
-    background: var(--col-surface);
-    border: 1px solid var(--col-border);
-    border-radius: var(--radius-lg);
-    box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+  /* DASHBOARD */
+  #dashboard-view {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
     display: none;
-    flex-direction: column;
-    overflow: hidden;
-    z-index: 500;
   }
-  #ai-panel.open { display: flex; }
+  #dashboard-view.visible { display: block; }
 
-  #ai-header {
-    padding: 12px 14px;
-    background: var(--col-sidebar);
-    color: #e0e3ea;
-    font-weight: 600;
-    font-size: 13px;
+  .dash-topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .dash-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--col-text);
+  }
+  .dash-subtitle {
+    font-size: 12px;
+    color: var(--col-text-muted);
+    margin-top: 2px;
   }
 
-  #ai-messages {
-    padding: 12px;
-    flex: 1;
-    overflow-y: auto;
-    max-height: 280px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    font-size: 13px;
-    line-height: 1.5;
+  .kpi-cards {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
   }
-
-  .ai-msg { padding: 8px 10px; border-radius: var(--radius); }
-  .ai-msg.user { background: var(--col-teal-light); color: var(--col-teal-dark); align-self: flex-end; max-width: 90%; }
-  .ai-msg.assistant { background: var(--col-surface2); color: var(--col-text); align-self: flex-start; max-width: 95%; }
-
-  #ai-input-row {
-    display: flex;
-    gap: 6px;
-    padding: 10px 12px;
-    border-top: 1px solid var(--col-border);
-  }
-
-  #ai-input {
-    flex: 1;
-    padding: 7px 10px;
+  .kpi-card {
+    background: var(--col-surface);
     border: 1px solid var(--col-border);
-    border-radius: var(--radius);
-    font-size: 13px;
-    outline: none;
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
   }
-  #ai-input:focus { border-color: var(--col-teal); }
-
-  #ai-btn-float {
-    position: fixed;
-    right: 24px;
-    bottom: 24px;
-    background: var(--col-teal);
-    color: white;
-    border: none;
-    border-radius: 24px;
-    padding: 10px 18px;
-    font-size: 13px;
+  .kpi-card .kpi-label {
+    font-size: 11px;
     font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    box-shadow: 0 2px 12px rgba(29,158,117,0.3);
-    z-index: 400;
-    transition: background 0.12s;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--col-text-faint);
+    margin-bottom: 6px;
   }
-  #ai-btn-float:hover { background: var(--col-teal-dark); }
-  #ai-panel.open ~ #ai-btn-float { display: none; }
+  .kpi-card .kpi-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--col-text);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .kpi-card .kpi-delta {
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 4px;
+  }
+  .kpi-delta.positive { color: var(--col-teal-dark); }
+  .kpi-delta.negative { color: var(--col-red); }
+  .kpi-delta.neutral { color: var(--col-text-faint); }
+
+  .dash-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .dash-grid.full { grid-template-columns: 1fr; }
+
+  .dash-section {
+    background: var(--col-surface);
+    border: 1px solid var(--col-border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+  }
+  .dash-section-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--col-text-muted);
+    margin-bottom: 12px;
+  }
+
+  .bar-list { display: flex; flex-direction: column; gap: 10px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; }
+  .bar-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--col-text);
+    width: 110px;
+    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bar-track {
+    flex: 1;
+    height: 8px;
+    background: var(--col-surface2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+  }
+  .bar-value {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--col-text-muted);
+    width: 84px;
+    flex-shrink: 0;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dash-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .dash-table th {
+    text-align: left;
+    padding: 6px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--col-text-faint);
+    border-bottom: 1px solid var(--col-border);
+  }
+  .dash-table td {
+    padding: 7px 8px;
+    border-bottom: 1px solid var(--col-border);
+    color: var(--col-text);
+  }
+  .dash-table tbody tr:last-child td { border-bottom: none; }
+  .dash-table tbody tr:hover { background: var(--col-surface2); cursor: pointer; }
+  .dash-table .num { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .dash-table .neg { color: var(--col-red); }
+  .dash-table .pos { color: var(--col-teal-dark); }
+
+  .progress-wrap { display: flex; align-items: center; gap: 12px; }
+  .progress-track {
+    flex: 1; height: 14px;
+    background: var(--col-surface2);
+    border-radius: 7px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--col-teal);
+    border-radius: 7px;
+    transition: width 0.4s ease;
+  }
+  .progress-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--col-text);
+    white-space: nowrap;
+  }
+
+  @media (max-width: 1200px) {
+    .kpi-cards { grid-template-columns: repeat(3, 1fr); }
+    .dash-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 700px) {
+    .kpi-cards { grid-template-columns: repeat(2, 1fr); }
+  }
 
   /* Responsive table */
   @media (max-width: 900px) {
@@ -615,51 +719,23 @@
   </div>
 
   <div class="sidebar-section">
-    <div class="sidebar-label">Segmenti</div>
-    <div class="sidebar-item active" data-filter="ALL">
-      <span class="dot" style="background:#9aa0b0"></span>
-      Tutti
-      <span class="count" id="cnt-all">—</span>
+    <div class="nav-main-item active" data-view="clienti" id="nav-clienti">
+      <span class="icon">📋</span>
+      Clienti
     </div>
-    <div class="sidebar-item" data-filter="WORKBOX">
-      <span class="dot" style="background:var(--col-teal)"></span>
-      Workbox (TOP)
-      <span class="count" id="cnt-workbox">—</span>
-    </div>
-    <div class="sidebar-item" data-filter="CATALOGOSP">
-      <span class="dot" style="background:var(--col-blue)"></span>
-      Catalogo Spring
-      <span class="count" id="cnt-cat">—</span>
-    </div>
-    <div class="sidebar-item" data-filter="OK24NO25">
-      <span class="dot" style="background:var(--col-amber)"></span>
-      OK24 No Vis25
-      <span class="count" id="cnt-ok24">—</span>
-    </div>
-    <div class="sidebar-item" data-filter="OK25NOVIS">
-      <span class="dot" style="background:var(--col-purple)"></span>
-      OK25 No Visita
-      <span class="count" id="cnt-ok25">—</span>
-    </div>
-    <div class="sidebar-item" data-filter="DORMIENTI">
-      <span class="dot" style="background:var(--col-red)"></span>
-      Dormienti
-      <span class="count" id="cnt-dorm">—</span>
-    </div>
-    <div class="sidebar-item" data-filter="NONINT">
-      <span class="dot" style="background:#464a58"></span>
-      Non interessati
-      <span class="count" id="cnt-nonint">—</span>
-    </div>
-    <div class="sidebar-item" data-filter="ACTIVE">
-      <span class="dot" style="background:#1D9E75"></span>
-      Attivi (nessun tag)
-      <span class="count" id="cnt-active">—</span>
+    <div class="nav-main-item" data-view="dashboard" id="nav-dashboard">
+      <span class="icon">📊</span>
+      Dashboard
     </div>
   </div>
 
   <div class="sidebar-section" style="margin-top:8px">
     <div class="sidebar-label">Visite 2026</div>
+    <div class="sidebar-item active" data-filter="ALL">
+      <span class="dot" style="background:#9aa0b0"></span>
+      Tutti
+      <span class="count" id="cnt-all">—</span>
+    </div>
     <div class="sidebar-item" data-filter="VISITA_YES">
       <span class="dot" style="background:var(--col-teal)"></span>
       Visitati
@@ -737,27 +813,60 @@
       </div>
     </div>
   </div>
+
+  <div id="dashboard-view">
+    <div class="dash-topbar">
+      <div>
+        <div class="dash-title">Dashboard KPI</div>
+        <div class="dash-subtitle" id="dash-updated">—</div>
+      </div>
+      <button class="btn btn-primary" id="btn-dash-refresh">⟳ Aggiorna</button>
+    </div>
+
+    <div class="kpi-cards" id="dash-kpi-cards"></div>
+
+    <div class="dash-grid">
+      <div class="dash-section">
+        <div class="dash-section-title">Segmentazione PROG26</div>
+        <div class="bar-list" id="dash-prog26"></div>
+      </div>
+      <div class="dash-section">
+        <div class="dash-section-title">Network</div>
+        <div class="bar-list" id="dash-network"></div>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="dash-section">
+        <div class="dash-section-title">Provincia</div>
+        <div class="bar-list" id="dash-provincia"></div>
+      </div>
+      <div class="dash-section">
+        <div class="dash-section-title">Visite 2026</div>
+        <div id="dash-visite"></div>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="dash-section">
+        <div class="dash-section-title">Top 15 clienti — Fatturato 2026</div>
+        <table class="dash-table" id="dash-top-clienti">
+          <thead><tr><th>Cliente</th><th>Città</th><th class="num">2025</th><th class="num">2026</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="dash-section">
+        <div class="dash-section-title">Clienti in calo (2025 → 2026)</div>
+        <table class="dash-table" id="dash-calo-clienti">
+          <thead><tr><th>Cliente</th><th>Città</th><th class="num">2025</th><th class="num">2026</th><th class="num">Δ</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="toast"></div>
-
-<!-- AI Float button -->
-<button id="ai-btn-float" onclick="toggleAI()">✦ Chiedi a Claude</button>
-
-<!-- AI Panel -->
-<div id="ai-panel">
-  <div id="ai-header">
-    <span>✦ Assistente MAK</span>
-    <button onclick="toggleAI()" style="background:none;border:none;color:#9aa0b0;cursor:pointer;font-size:16px;line-height:1">×</button>
-  </div>
-  <div id="ai-messages">
-    <div class="ai-msg assistant">Ciao Stefano! Dimmi cosa ti serve: analisi clienti, draft messaggio WhatsApp, priorità visite, segmentazione — sono qui.</div>
-  </div>
-  <div id="ai-input-row">
-    <input id="ai-input" type="text" placeholder="Scrivi..." onkeydown="if(event.key==='Enter')sendAI()">
-    <button class="btn btn-primary" onclick="sendAI()">Invia</button>
-  </div>
-</div>
 
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────
@@ -771,17 +880,16 @@ let currentFilter = 'ALL';
 let selectedIndex = null;
 let selectedRow = null;
 let pendingEdits = {};
-let aiMessages = [{ role: 'assistant', content: 'Ciao Stefano! Dimmi cosa ti serve: analisi clienti, draft messaggio WhatsApp, priorità visite, segmentazione — sono qui.' }];
 
 // ─── PROG26 CONFIG ────────────────────────────────────────────────
 const PROG26_CONFIG = {
-  'WORKBOX':    { label: 'Workbox',     bg: '#E1F5EE', color: '#0F6E56' },
-  'CATALOGOSP': { label: 'Cat. Spring', bg: '#E6F1FB', color: '#0C447C' },
-  'OK24NO25':   { label: 'OK24 No25',  bg: '#FAEEDA', color: '#633806' },
-  'OK25NOVIS':  { label: 'OK25 NoVis', bg: '#EEEDFE', color: '#3C3489' },
-  'DORMIENTI':  { label: 'Dormiente',  bg: '#FCEBEB', color: '#791F1F' },
-  'NONINT':     { label: 'Non int.',   bg: '#F1EFE8', color: '#444441' },
-  '':           { label: 'Attivo',     bg: '#E1F5EE', color: '#0F6E56' },
+  'WORKBOX':    { label: 'Workbox',       bg: '#E1F5EE', color: '#0F6E56' },
+  'CATALOGOSP': { label: 'Cat. Spedito',  bg: '#E6F1FB', color: '#0C447C' },
+  'OK24NO25':   { label: 'OK24 No25',    bg: '#FAEEDA', color: '#633806' },
+  'OK25NOVIS':  { label: 'OK25 NoVis',   bg: '#EEEDFE', color: '#3C3489' },
+  'DORMIENTI':  { label: 'Dormiente',    bg: '#FCEBEB', color: '#791F1F' },
+  'NONINT':     { label: 'Non int.',     bg: '#F1EFE8', color: '#444441' },
+  '':           { label: 'Attivo',       bg: '#E1F5EE', color: '#0F6E56' },
 };
 
 // ─── LOAD DATA ────────────────────────────────────────────────────
@@ -818,6 +926,7 @@ function parseRows(rows) {
   applyFilter();
   updateSidebarCounts();
   updateStats();
+  renderDashboard();
   document.getElementById('loading-overlay').style.display = 'none';
 }
 
@@ -1098,17 +1207,7 @@ async function writeToSheet(clienteName, codice, edits) {
 function updateSidebarCounts() {
   const count = (fn) => allClients.filter(fn).length;
 
-  const getP = (v) => (v['PROG26'] || '').trim().toUpperCase();
-
   document.getElementById('cnt-all').textContent = allClients.length;
-  document.getElementById('cnt-workbox').textContent = count(c => getP(c) === 'WORKBOX');
-  document.getElementById('cnt-cat').textContent = count(c => getP(c) === 'CATALOGOSP');
-  document.getElementById('cnt-ok24').textContent = count(c => getP(c) === 'OK24NO25');
-  document.getElementById('cnt-ok25').textContent = count(c => getP(c) === 'OK25NOVIS');
-  document.getElementById('cnt-dorm').textContent = count(c => getP(c) === 'DORMIENTI');
-  document.getElementById('cnt-nonint').textContent = count(c => getP(c) === 'NONINT');
-  document.getElementById('cnt-active').textContent = count(c => !c['PROG26'] || c['PROG26'].trim() === '');
-
   document.getElementById('cnt-vis-yes').textContent = count(c => c['VISITA 2026'] && c['VISITA 2026'].toString().trim() !== '');
   document.getElementById('cnt-vis-no').textContent = count(c => !c['VISITA 2026'] || c['VISITA 2026'].toString().trim() === '');
 }
@@ -1124,7 +1223,188 @@ function updateStats() {
   document.getElementById('stat-attivi').textContent = attivi;
 }
 
-// ─── SIDEBAR CLICK ────────────────────────────────────────────────
+// ─── DASHBOARD ─────────────────────────────────────────────────────
+const NETWORK_COLORS = {
+  'ASCONAUTO': '#1D9E75',
+  'FIRST STOP': '#185FA5',
+  'DRIVER': '#BA7517',
+};
+const BAR_PALETTE = ['#1D9E75', '#185FA5', '#BA7517', '#534AB7', '#A32D2D', '#3C3489', '#606472', '#0F6E56'];
+
+function renderDashboard() {
+  if (!allClients.length) return;
+
+  const sum = (arr, key) => arr.reduce((a, c) => a + numFat(c[key]), 0);
+  const fat25 = sum(allClients, '2025');
+  const fat26 = sum(allClients, '2026');
+  const deltaPct = fat25 > 0 ? ((fat26 - fat25) / fat25 * 100) : 0;
+
+  const visitati = allClients.filter(c => c['VISITA 2026'] && c['VISITA 2026'].toString().trim() !== '').length;
+  const visPct = allClients.length ? Math.round((visitati / allClients.length) * 100) : 0;
+
+  const clientiAttivi26 = allClients.filter(c => numFat(c['2026']) > 0).length;
+
+  // ── KPI cards ──
+  const cards = [
+    { label: 'Clienti totali', value: allClients.length.toLocaleString('it-IT') },
+    { label: 'Fatturato 2025', value: formatK(fat25) },
+    { label: 'Fatturato 2026', value: formatK(fat26), delta: deltaPct },
+    { label: 'Clienti fatturanti 2026', value: clientiAttivi26.toLocaleString('it-IT') },
+    { label: 'Visite 2026', value: `${visitati} / ${allClients.length}`, sub: `${visPct}%` },
+  ];
+
+  document.getElementById('dash-kpi-cards').innerHTML = cards.map(c => {
+    let deltaHtml = '';
+    if (c.delta !== undefined) {
+      const cls = c.delta > 0.5 ? 'positive' : (c.delta < -0.5 ? 'negative' : 'neutral');
+      const sign = c.delta > 0 ? '+' : '';
+      deltaHtml = `<div class="kpi-delta ${cls}">${sign}${c.delta.toFixed(1)}% vs 2025</div>`;
+    } else if (c.sub) {
+      deltaHtml = `<div class="kpi-delta neutral">${c.sub} visitati</div>`;
+    }
+    return `<div class="kpi-card">
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-value">${c.value}</div>
+      ${deltaHtml}
+    </div>`;
+  }).join('');
+
+  document.getElementById('dash-updated').textContent = 'Aggiornato: ' + new Date().toLocaleString('it-IT');
+
+  // ── Segmentazione PROG26 ──
+  const progGroups = {};
+  allClients.forEach(c => {
+    const key = (c['PROG26'] || '').trim().toUpperCase();
+    if (!progGroups[key]) progGroups[key] = { count: 0, fat25: 0, fat26: 0 };
+    progGroups[key].count++;
+    progGroups[key].fat25 += numFat(c['2025']);
+    progGroups[key].fat26 += numFat(c['2026']);
+  });
+  const progEntries = Object.entries(progGroups).sort((a, b) => b[1].count - a[1].count);
+  const maxProgCount = Math.max(...progEntries.map(e => e[1].count), 1);
+  document.getElementById('dash-prog26').innerHTML = progEntries.map(([key, val], i) => {
+    const pc = PROG26_CONFIG[key] || PROG26_CONFIG[''];
+    const pct = Math.round((val.count / maxProgCount) * 100);
+    return `<div class="bar-row">
+      <div class="bar-label" title="${pc.label}">${pc.label}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${pc.color}"></div></div>
+      <div class="bar-value">${val.count} · ${formatK(val.fat25)}</div>
+    </div>`;
+  }).join('');
+
+  // ── Network ──
+  const netGroups = {};
+  allClients.forEach(c => {
+    const key = (c['NETWORK'] || '').trim() || '(nessuno)';
+    if (!netGroups[key]) netGroups[key] = { count: 0, fat25: 0, fat26: 0 };
+    netGroups[key].count++;
+    netGroups[key].fat25 += numFat(c['2025']);
+    netGroups[key].fat26 += numFat(c['2026']);
+  });
+  const netEntries = Object.entries(netGroups).sort((a, b) => b[1].count - a[1].count).slice(0, 8);
+  const maxNetCount = Math.max(...netEntries.map(e => e[1].count), 1);
+  document.getElementById('dash-network').innerHTML = netEntries.map(([key, val], i) => {
+    const pct = Math.round((val.count / maxNetCount) * 100);
+    const color = NETWORK_COLORS[key] || BAR_PALETTE[i % BAR_PALETTE.length];
+    return `<div class="bar-row">
+      <div class="bar-label" title="${key}">${key}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      <div class="bar-value">${val.count} · ${formatK(val.fat26)}</div>
+    </div>`;
+  }).join('');
+
+  // ── Provincia ──
+  const provGroups = {};
+  allClients.forEach(c => {
+    const key = (c['PR'] || '').trim() || '(n.d.)';
+    if (!provGroups[key]) provGroups[key] = { count: 0, fat26: 0 };
+    provGroups[key].count++;
+    provGroups[key].fat26 += numFat(c['2026']);
+  });
+  const provEntries = Object.entries(provGroups).sort((a, b) => b[1].count - a[1].count);
+  const maxProvCount = Math.max(...provEntries.map(e => e[1].count), 1);
+  document.getElementById('dash-provincia').innerHTML = provEntries.map(([key, val], i) => {
+    const pct = Math.round((val.count / maxProvCount) * 100);
+    return `<div class="bar-row">
+      <div class="bar-label" title="${key}">${key}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${BAR_PALETTE[i % BAR_PALETTE.length]}"></div></div>
+      <div class="bar-value">${val.count} · ${formatK(val.fat26)}</div>
+    </div>`;
+  }).join('');
+
+  // ── Visite 2026 progress ──
+  document.getElementById('dash-visite').innerHTML = `
+    <div class="progress-wrap" style="margin-bottom:10px">
+      <div class="progress-track"><div class="progress-fill" style="width:${visPct}%"></div></div>
+      <div class="progress-label">${visPct}%</div>
+    </div>
+    <div style="font-size:12px;color:var(--col-text-muted);line-height:1.6">
+      <strong style="color:var(--col-text)">${visitati}</strong> clienti visitati su <strong style="color:var(--col-text)">${allClients.length}</strong><br>
+      <strong style="color:var(--col-red)">${allClients.length - visitati}</strong> ancora da visitare nel 2026
+    </div>
+  `;
+
+  // ── Top 15 clienti fatturato 2026 ──
+  const topClienti = [...allClients]
+    .filter(c => numFat(c['2026']) > 0)
+    .sort((a, b) => numFat(b['2026']) - numFat(a['2026']))
+    .slice(0, 15);
+  document.querySelector('#dash-top-clienti tbody').innerHTML = topClienti.map(c => `
+    <tr onclick="goToClient('${escJs(c['COD.'])}')">
+      <td>${truncate(c['CLIENTE'] || '—', 28)}</td>
+      <td style="color:var(--col-text-muted)">${c['CITTÀ'] || '—'}</td>
+      <td class="num">${formatFat(c['2025'])}</td>
+      <td class="num pos">${formatFat(c['2026'])}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="4" style="color:var(--col-text-faint);text-align:center;padding:16px">Nessun dato</td></tr>';
+
+  // ── Clienti in calo (2025 > 0, 2026 in calo) ──
+  const caloClienti = [...allClients]
+    .filter(c => numFat(c['2025']) > 0 && numFat(c['2026']) < numFat(c['2025']))
+    .map(c => ({ c, delta: numFat(c['2026']) - numFat(c['2025']) }))
+    .sort((a, b) => a.delta - b.delta)
+    .slice(0, 15);
+  document.querySelector('#dash-calo-clienti tbody').innerHTML = caloClienti.map(({c, delta}) => `
+    <tr onclick="goToClient('${escJs(c['COD.'])}')">
+      <td>${truncate(c['CLIENTE'] || '—', 26)}</td>
+      <td style="color:var(--col-text-muted)">${c['CITTÀ'] || '—'}</td>
+      <td class="num">${formatFat(c['2025'])}</td>
+      <td class="num">${formatFat(c['2026'])}</td>
+      <td class="num neg">${formatFat(delta)}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="5" style="color:var(--col-text-faint);text-align:center;padding:16px">Nessun cliente in calo</td></tr>';
+}
+
+function goToClient(codice) {
+  // Torna alla vista clienti
+  document.querySelectorAll('.nav-main-item').forEach(e => e.classList.remove('active'));
+  document.getElementById('nav-clienti').classList.add('active');
+  document.getElementById('topbar').style.display = 'flex';
+  document.getElementById('content').style.display = 'flex';
+  document.getElementById('dashboard-view').classList.remove('visible');
+
+  // Reset filtri e cerca per codice
+  currentFilter = 'ALL';
+  document.querySelectorAll('.sidebar-item').forEach(e => e.classList.remove('active'));
+  document.querySelector('.sidebar-item[data-filter="ALL"]').classList.add('active');
+  document.getElementById('current-filter-label').textContent = 'Tutti i clienti';
+  document.getElementById('filter-tipo').value = '';
+  document.getElementById('filter-network').value = '';
+  document.getElementById('filter-prov').value = '';
+  document.getElementById('search').value = codice;
+  applyFilter();
+
+  const idx = filteredClients.findIndex(c => c['COD.'] === codice);
+  if (idx >= 0) {
+    selectedIndex = idx;
+    renderTable();
+    showDetail(filteredClients[idx]);
+    const row = document.querySelectorAll('#client-tbody tr')[idx];
+    if (row) row.scrollIntoView({ block: 'center' });
+  }
+}
+
+// ─── SIDEBAR CLICK (filtri Visite) ────────────────────────────────
 document.querySelectorAll('.sidebar-item').forEach(el => {
   el.addEventListener('click', () => {
     document.querySelectorAll('.sidebar-item').forEach(e => e.classList.remove('active'));
@@ -1132,19 +1412,37 @@ document.querySelectorAll('.sidebar-item').forEach(el => {
     currentFilter = el.dataset.filter;
     const labels = {
       'ALL': 'Tutti i clienti',
-      'WORKBOX': 'Top clienti — Workbox',
-      'CATALOGOSP': 'Catalogo Spring',
-      'OK24NO25': 'OK 2024, nessuna visita 2025',
-      'OK25NOVIS': 'OK 2025, da visitare',
-      'DORMIENTI': 'Clienti dormienti',
-      'NONINT': 'Non interessati',
-      'ACTIVE': 'Clienti attivi (nessun tag)',
       'VISITA_YES': 'Visitati nel 2026',
       'VISITA_NO': 'Da visitare nel 2026',
     };
     document.getElementById('current-filter-label').textContent = labels[currentFilter] || '';
     applyFilter();
   });
+});
+
+// ─── NAV VIEW SWITCH (Clienti / Dashboard) ────────────────────────
+document.querySelectorAll('.nav-main-item').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.nav-main-item').forEach(e => e.classList.remove('active'));
+    el.classList.add('active');
+    const view = el.dataset.view;
+    if (view === 'dashboard') {
+      document.getElementById('topbar').style.display = 'none';
+      document.getElementById('content').style.display = 'none';
+      document.getElementById('dashboard-view').classList.add('visible');
+      renderDashboard();
+    } else {
+      document.getElementById('topbar').style.display = 'flex';
+      document.getElementById('content').style.display = 'flex';
+      document.getElementById('dashboard-view').classList.remove('visible');
+    }
+  });
+});
+
+document.getElementById('btn-dash-refresh').addEventListener('click', () => {
+  document.getElementById('loading-overlay').style.display = 'flex';
+  document.getElementById('loading-overlay').querySelector('span').textContent = 'Aggiornamento...';
+  loadData();
 });
 
 // ─── SEARCH & FILTERS ─────────────────────────────────────────────
@@ -1158,77 +1456,6 @@ document.getElementById('btn-sync').addEventListener('click', () => {
   document.getElementById('loading-overlay').querySelector('span').textContent = 'Aggiornamento...';
   loadData();
 });
-
-// ─── AI ASSISTANT ─────────────────────────────────────────────────
-function toggleAI() {
-  document.getElementById('ai-panel').classList.toggle('open');
-}
-
-async function sendAI() {
-  const inp = document.getElementById('ai-input');
-  const text = inp.value.trim();
-  if (!text) return;
-  inp.value = '';
-
-  aiMessages.push({ role: 'user', content: text });
-  renderAIMessages();
-
-  // Contesto clienti correnti
-  const context = buildAIContext(text);
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        system: `Sei l'assistente CRM di Stefano, agente commerciale MAK 2026 (gomme/cerchi).
-Province: Milano, Monza-Brianza, Lodi.
-Clienti totali: ${allClients.length}. Attualmente filtrati: ${filteredClients.length}.
-Rispondi in italiano, diretto e pratico. Conosci: listini, provvigioni, network (ASCONAUTO, FIRST STOP, DRIVER), PROG26 segmentazione, ruotini, TPMS, Tool8.
-${context}`,
-        messages: aiMessages.filter(m => m.role !== 'assistant' || m !== aiMessages[0])
-      })
-    });
-
-    const data = await res.json();
-    const reply = data.content?.[0]?.text || 'Errore risposta AI.';
-    aiMessages.push({ role: 'assistant', content: reply });
-    renderAIMessages();
-  } catch(e) {
-    aiMessages.push({ role: 'assistant', content: 'Errore connessione. Riprova.' });
-    renderAIMessages();
-  }
-}
-
-function buildAIContext(query) {
-  const det = document.getElementById('detail-content');
-  const currentClient = det._currentClient;
-  let ctx = '';
-
-  if (currentClient) {
-    ctx += `\nCliente selezionato: ${currentClient['CLIENTE']}, ${currentClient['TIPO']}, ${currentClient['CITTÀ']}, fat25: ${currentClient['2025']}, fat26: ${currentClient['2026']}, prog26: ${currentClient['PROG26']}.`;
-  }
-
-  // Stats sintetiche
-  const workbox = allClients.filter(c => (c['PROG26']||'').trim().toUpperCase() === 'WORKBOX').length;
-  ctx += `\nSegmenti: Workbox=${workbox}, totale=${allClients.length}.`;
-
-  return ctx;
-}
-
-function renderAIMessages() {
-  const container = document.getElementById('ai-messages');
-  container.innerHTML = '';
-  aiMessages.forEach(m => {
-    const div = document.createElement('div');
-    div.className = `ai-msg ${m.role}`;
-    div.textContent = m.content;
-    container.appendChild(div);
-  });
-  container.scrollTop = container.scrollHeight;
-}
 
 // ─── UTILS ────────────────────────────────────────────────────────
 function formatFat(v) {
