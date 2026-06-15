@@ -719,8 +719,14 @@
     font-size: 12px;
     font-weight: 700;
     cursor: pointer;
+    margin-bottom: 6px;
   }
+  .map-popup-btn:last-child { margin-bottom: 0; }
   .map-popup-btn:hover { background: var(--col-teal-dark); }
+  .map-popup-btn-visited {
+    background: #4a4a4a;
+  }
+  .map-popup-btn-visited:hover { background: #2e2e2e; }
 
   .dash-topbar {
     display: flex;
@@ -948,7 +954,7 @@
     .dash-table { font-size: 11px; }
 
     /* Mappa */
-    #map-view .dash-topbar { padding: 12px 12px 0; }
+    #map-view .dash-topbar { padding: 12px 12px 0; flex-wrap: wrap; }
     #map-legend { padding: 0 12px 10px; }
     .map-legend-item { font-size: 11px; padding: 4px 8px; }
   }
@@ -1149,6 +1155,7 @@
         <div class="dash-title">Mappa clienti</div>
         <div class="dash-subtitle" id="map-status">—</div>
       </div>
+      <button class="btn" id="btn-map-reset-hidden">↺ Mostra tutti</button>
       <button class="btn btn-primary" id="btn-map-retry">⟳ Riprova</button>
     </div>
     <div id="map-legend">
@@ -1216,7 +1223,10 @@ let geocodingInProgress = false;
 let geoOkCount = 0;
 let geoFailCount = 0;
 let unmappedClients = [];
+let hiddenClients = new Set();
+let clientMarkers = {};
 const GEOCODE_CACHE_KEY = 'mak_geocache_v2';
+const HIDDEN_MAP_KEY = 'mak_map_hidden_v1';
 // Sulla mappa mostriamo solo i clienti da "lavorare": non interessati,
 // in calo, dormienti e senza visita
 const MAP_PROG26_KEYS = ['NONINT', 'OK24NO25', 'OK25NOVIS', 'DORMIENTI'];
@@ -1810,6 +1820,16 @@ function saveGeocodeCache() {
   try { localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(geocodeCache)); } catch(e) {}
 }
 
+function loadHiddenClients() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(HIDDEN_MAP_KEY) || '[]');
+    return new Set(arr.map(String));
+  } catch(e) { return new Set(); }
+}
+function saveHiddenClients() {
+  try { localStorage.setItem(HIDDEN_MAP_KEY, JSON.stringify(Array.from(hiddenClients))); } catch(e) {}
+}
+
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // Offset deterministico (basato sul codice cliente) per separare visivamente
@@ -1896,6 +1916,7 @@ function initMapView() {
       }
     });
 
+    hiddenClients = loadHiddenClients();
     renderMapLegend();
     geocodeCache = loadGeocodeCache();
     startGeocoding();
@@ -1909,6 +1930,7 @@ function initMapView() {
 function renderMapLegend() {
   const counts = {};
   mapClients().forEach(c => {
+    if (hiddenClients.has(String(c['COD.']))) return;
     const key = (c['PROG26'] || '').trim().toUpperCase();
     counts[key] = (counts[key] || 0) + 1;
   });
@@ -1935,12 +1957,14 @@ function toggleMapLayer(key, el) {
 }
 
 function buildMapPopup(c, pc) {
+  const cod = escJs(c['COD.']);
   return `
     <div class="map-popup-name">${c['CLIENTE'] || '—'}</div>
     <div class="map-popup-meta">${c['TIPO'] || ''} ${c['TIPO'] && c['NETWORK'] ? '·' : ''} ${c['NETWORK'] || ''} — ${c["CITTA'"] || ''}</div>
     <div class="map-popup-pill" style="background:${pc.bg};color:${pc.color}">${pc.label}</div>
     <div class="map-popup-fat">Fat. 2025: <strong>${formatFat(c['2025'])}</strong> · 2026: <strong>${formatFat(c['2026'])}</strong></div>
-    <button class="map-popup-btn" onclick="goToClient('${escJs(c['COD.'])}')">Apri scheda</button>
+    <button class="map-popup-btn" onclick="goToClient('${cod}')">Apri scheda</button>
+    <button class="map-popup-btn map-popup-btn-visited" onclick="hideClientFromMap('${cod}')">✓ Visitato — rimuovi dalla mappa</button>
   `;
 }
 
@@ -1952,6 +1976,8 @@ function plotClients(clients, baseCoords) {
   }
   clients.forEach(c => {
     try {
+      const cod = String(c['COD.'] || '');
+      if (hiddenClients.has(cod)) return;
       const key = (c['PROG26'] || '').trim().toUpperCase();
       if (!mapLayers[key]) return;
       const pc = PROG26_CONFIG[key] || PROG26_CONFIG[''];
@@ -1969,10 +1995,44 @@ function plotClients(clients, baseCoords) {
       });
       marker.bindPopup(buildMapPopup(c, pc));
       marker.addTo(mapLayers[key]);
+      if (cod) clientMarkers[cod] = { marker, layerKey: key };
     } catch(e) {
       console.error('Errore plotting cliente', c['COD.'], e);
     }
   });
+}
+
+function hideClientFromMap(cod) {
+  cod = String(cod || '');
+  if (!cod) return;
+  hiddenClients.add(cod);
+  saveHiddenClients();
+  const entry = clientMarkers[cod];
+  if (entry && mapLayers[entry.layerKey]) {
+    mapLayers[entry.layerKey].removeLayer(entry.marker);
+  }
+  delete clientMarkers[cod];
+  renderMapLegend();
+  updateMapStatus(0, 0);
+  showToast('Cliente segnato come visitato e rimosso dalla mappa.');
+}
+
+function resetHiddenClients() {
+  if (hiddenClients.size === 0) {
+    showToast('Nessun cliente nascosto da ripristinare.');
+    return;
+  }
+  if (!confirm(`Vuoi far tornare visibili sulla mappa tutti i ${hiddenClients.size} clienti segnati come visitati?`)) return;
+  hiddenClients.clear();
+  saveHiddenClients();
+  if (mapInstance) {
+    Object.values(mapLayers).forEach(layer => layer.clearLayers());
+    clientMarkers = {};
+    geocodingInProgress = false;
+    startGeocoding();
+  }
+  renderMapLegend();
+  showToast('Ripristinati tutti i clienti sulla mappa.');
 }
 
 async function geocodeQuery(query) {
@@ -2015,11 +2075,12 @@ function updateMapStatus(remaining, total) {
   } else {
     const totalC = clients.length;
     const unmapped = unmappedClients.length;
-    if (unmapped > 0) {
-      el.textContent = `${totalC - unmapped}/${totalC} clienti mappati — ${unmapped} non trovati (indirizzo non riconosciuto, dettagli in console)`;
-    } else {
-      el.textContent = `${totalC}/${totalC} clienti mappati`;
-    }
+    const visited = clients.filter(c => hiddenClients.has(String(c['COD.']))).length;
+    const onMap = totalC - unmapped - visited;
+    let msg = `${onMap} clienti da visitare sulla mappa`;
+    if (visited > 0) msg += ` · ${visited} già visitati`;
+    if (unmapped > 0) msg += ` · ${unmapped} non geocodificati (console)`;
+    el.textContent = msg;
   }
 }
 
@@ -2126,6 +2187,7 @@ function retryGeocoding() {
 }
 
 document.getElementById('btn-map-retry').addEventListener('click', retryGeocoding);
+document.getElementById('btn-map-reset-hidden').addEventListener('click', resetHiddenClients);
 
 function goToClient(codice) {
   // Torna alla vista clienti
