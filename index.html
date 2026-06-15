@@ -1794,7 +1794,16 @@ function renderDashboard() {
 
 // ─── MAPPA ──────────────────────────────────────────────────────────
 function loadGeocodeCache() {
-  try { return JSON.parse(localStorage.getItem(GEOCODE_CACHE_KEY) || '{}'); } catch(e) { return {}; }
+  let cache = {};
+  try { cache = JSON.parse(localStorage.getItem(GEOCODE_CACHE_KEY) || '{}'); } catch(e) { cache = {}; }
+  // Rimuove eventuali voci con coordinate non valide (NaN, mancanti, ecc.)
+  Object.keys(cache).forEach(key => {
+    const v = cache[key];
+    if (!v || typeof v.lat !== 'number' || typeof v.lng !== 'number' || !isFinite(v.lat) || !isFinite(v.lng)) {
+      delete cache[key];
+    }
+  });
+  return cache;
 }
 function saveGeocodeCache() {
   try { localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(geocodeCache)); } catch(e) {}
@@ -1837,21 +1846,27 @@ function buildGeoQuery(c) {
 function initMapView() {
   if (mapInstance) return;
 
-  mapInstance = L.map('map-container', { preferCanvas: true }).setView([45.50, 9.30], 10);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 18,
-    attribution: '© OpenStreetMap contributors'
-  }).addTo(mapInstance);
+  try {
+    mapInstance = L.map('map-container', { preferCanvas: true }).setView([45.50, 9.30], 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(mapInstance);
 
-  Object.keys(PROG26_CONFIG).forEach(key => {
-    if (MAP_PROG26_KEYS.includes(key)) {
-      mapLayers[key] = L.layerGroup().addTo(mapInstance);
-    }
-  });
+    Object.keys(PROG26_CONFIG).forEach(key => {
+      if (MAP_PROG26_KEYS.includes(key)) {
+        mapLayers[key] = L.layerGroup().addTo(mapInstance);
+      }
+    });
 
-  renderMapLegend();
-  geocodeCache = loadGeocodeCache();
-  startGeocoding();
+    renderMapLegend();
+    geocodeCache = loadGeocodeCache();
+    startGeocoding();
+  } catch(e) {
+    console.error('Errore inizializzazione mappa:', e);
+    const el = document.getElementById('map-status');
+    if (el) el.textContent = '⚠ Errore inizializzazione mappa: ' + e.message;
+  }
 }
 
 function renderMapLegend() {
@@ -1893,23 +1908,33 @@ function buildMapPopup(c, pc) {
 }
 
 function plotClients(clients, baseCoords) {
+  if (!baseCoords || typeof baseCoords.lat !== 'number' || typeof baseCoords.lng !== 'number' ||
+      !isFinite(baseCoords.lat) || !isFinite(baseCoords.lng)) {
+    console.warn('plotClients: coordinate base non valide', baseCoords);
+    return;
+  }
   clients.forEach(c => {
-    const key = (c['PROG26'] || '').trim().toUpperCase();
-    if (!mapLayers[key]) return;
-    const pc = PROG26_CONFIG[key] || PROG26_CONFIG[''];
-    const off = hashOffset(c['COD.'] || c['CLIENTE'] || '');
-    const lat = baseCoords.lat + off.dy;
-    const lng = baseCoords.lng + off.dx;
+    try {
+      const key = (c['PROG26'] || '').trim().toUpperCase();
+      if (!mapLayers[key]) return;
+      const pc = PROG26_CONFIG[key] || PROG26_CONFIG[''];
+      const off = hashOffset(c['COD.'] || c['CLIENTE'] || '');
+      const lat = baseCoords.lat + off.dy;
+      const lng = baseCoords.lng + off.dx;
+      if (!isFinite(lat) || !isFinite(lng)) return;
 
-    const marker = L.circleMarker([lat, lng], {
-      radius: 6,
-      color: '#fff',
-      weight: 1.5,
-      fillColor: pc.color,
-      fillOpacity: 0.85
-    });
-    marker.bindPopup(buildMapPopup(c, pc));
-    marker.addTo(mapLayers[key]);
+      const marker = L.circleMarker([lat, lng], {
+        radius: 6,
+        color: '#fff',
+        weight: 1.5,
+        fillColor: pc.color,
+        fillOpacity: 0.85
+      });
+      marker.bindPopup(buildMapPopup(c, pc));
+      marker.addTo(mapLayers[key]);
+    } catch(e) {
+      console.error('Errore plotting cliente', c['COD.'], e);
+    }
   });
 }
 
@@ -1957,45 +1982,52 @@ function updateMapStatus(remaining, total) {
 }
 
 async function startGeocoding() {
-  // Raggruppa per indirizzo completo (via, CAP, città, prov) — solo segmenti da mappare
-  const addrMap = {};
-  mapClients().forEach(c => {
-    const geo = buildGeoQuery(c);
-    if (!geo) return;
-    if (!addrMap[geo.cacheKey]) addrMap[geo.cacheKey] = { query: geo.query, clients: [] };
-    addrMap[geo.cacheKey].clients.push(c);
-  });
+  try {
+    // Raggruppa per indirizzo completo (via, CAP, città, prov) — solo segmenti da mappare
+    const addrMap = {};
+    mapClients().forEach(c => {
+      const geo = buildGeoQuery(c);
+      if (!geo) return;
+      if (!addrMap[geo.cacheKey]) addrMap[geo.cacheKey] = { query: geo.query, clients: [] };
+      addrMap[geo.cacheKey].clients.push(c);
+    });
 
-  const toGeocode = [];
-  Object.entries(addrMap).forEach(([key, group]) => {
-    if (geocodeCache[key]) {
-      plotClients(group.clients, geocodeCache[key]);
-    } else {
-      toGeocode.push([key, group]);
+    const toGeocode = [];
+    Object.entries(addrMap).forEach(([key, group]) => {
+      if (geocodeCache[key]) {
+        plotClients(group.clients, geocodeCache[key]);
+      } else {
+        toGeocode.push([key, group]);
+      }
+    });
+
+    updateMapStatus(toGeocode.length, toGeocode.length);
+
+    if (toGeocode.length === 0 || geocodingInProgress) {
+      if (toGeocode.length === 0) updateMapStatus(0, 0);
+      return;
     }
-  });
+    geocodingInProgress = true;
 
-  updateMapStatus(toGeocode.length, toGeocode.length);
-
-  if (toGeocode.length === 0 || geocodingInProgress) {
-    if (toGeocode.length === 0) updateMapStatus(0, 0);
-    return;
-  }
-  geocodingInProgress = true;
-
-  for (let i = 0; i < toGeocode.length; i++) {
-    const [key, group] = toGeocode[i];
-    const coords = await geocodeQuery(group.query);
-    if (coords) {
-      geocodeCache[key] = coords;
-      saveGeocodeCache();
-      plotClients(group.clients, coords);
+    for (let i = 0; i < toGeocode.length; i++) {
+      const [key, group] = toGeocode[i];
+      const coords = await geocodeQuery(group.query);
+      if (coords) {
+        geocodeCache[key] = coords;
+        saveGeocodeCache();
+        plotClients(group.clients, coords);
+      }
+      updateMapStatus(toGeocode.length - i - 1, toGeocode.length);
+      await sleep(1100);
     }
-    updateMapStatus(toGeocode.length - i - 1, toGeocode.length);
-    await sleep(1100);
+    updateMapStatus(0, toGeocode.length);
+  } catch(e) {
+    console.error('Errore durante geocoding:', e);
+    const el = document.getElementById('map-status');
+    if (el) el.textContent = '⚠ Errore durante il geocoding: ' + e.message + ' (vedi console)';
+  } finally {
+    geocodingInProgress = false;
   }
-  geocodingInProgress = false;
-  updateMapStatus(0, toGeocode.length);
 }
 
 function retryGeocoding() {
@@ -2004,11 +2036,17 @@ function retryGeocoding() {
     return;
   }
   if (!mapInstance) return;
-  geoOkCount = 0;
-  geoFailCount = 0;
-  // Svuota i layer esistenti per evitare pin duplicati
-  Object.values(mapLayers).forEach(layer => layer.clearLayers());
-  startGeocoding();
+  try {
+    geoOkCount = 0;
+    geoFailCount = 0;
+    // Svuota i layer esistenti per evitare pin duplicati
+    Object.values(mapLayers).forEach(layer => layer.clearLayers());
+    startGeocoding();
+  } catch(e) {
+    console.error('Errore retry geocoding:', e);
+    const el = document.getElementById('map-status');
+    if (el) el.textContent = '⚠ Errore: ' + e.message + ' (vedi console)';
+  }
 }
 
 document.getElementById('btn-map-retry').addEventListener('click', retryGeocoding);
