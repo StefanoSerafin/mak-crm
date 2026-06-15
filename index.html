@@ -1215,6 +1215,7 @@ let geocodeCache = null;
 let geocodingInProgress = false;
 let geoOkCount = 0;
 let geoFailCount = 0;
+let unmappedClients = [];
 const GEOCODE_CACHE_KEY = 'mak_geocache_v2';
 // Sulla mappa mostriamo solo i clienti da "lavorare": non interessati,
 // in calo, dormienti e senza visita
@@ -1837,10 +1838,22 @@ function buildGeoQuery(c) {
   if (pr) parts.push(pr);
   parts.push('Italia');
 
-  return {
+  // Fallback senza via/numero: utile se l'indirizzo specifico non è in OSM
+  const fbParts = [];
+  if (cap) fbParts.push(cap);
+  fbParts.push(citta);
+  if (pr) fbParts.push(pr);
+  fbParts.push('Italia');
+
+  const result = {
     cacheKey: parts.join('|').toUpperCase(),
     query: parts.join(', ')
   };
+  if (indirizzo) {
+    result.fallbackCacheKey = fbParts.join('|').toUpperCase();
+    result.fallbackQuery = fbParts.join(', ');
+  }
+  return result;
 }
 
 function initMapView() {
@@ -1973,22 +1986,35 @@ function updateMapStatus(remaining, total) {
   const clients = mapClients();
   if (remaining > 0) {
     el.textContent = `Geocoding in corso… ${total - remaining}/${total} indirizzi (ok: ${geoOkCount}, falliti: ${geoFailCount})`;
-  } else if (total > 0 && geoOkCount === 0 && geoFailCount > 0) {
+  } else if (total > 0 && geoOkCount === 0 && geoFailCount > 0 && unmappedClients.length === clients.length) {
     el.textContent = `⚠ Geocoding fallito per tutti gli indirizzi (${geoFailCount}). Il servizio potrebbe essere temporaneamente bloccato — premi "Riprova" più tardi.`;
   } else {
-    const plotted = clients.filter(c => (c["CITTA'"]||'').trim()).length;
-    el.textContent = `${plotted} clienti da lavorare mappati su ${clients.length} totali`;
+    const totalC = clients.length;
+    const unmapped = unmappedClients.length;
+    if (unmapped > 0) {
+      el.textContent = `${totalC - unmapped}/${totalC} clienti mappati — ${unmapped} non trovati (indirizzo non riconosciuto, dettagli in console)`;
+    } else {
+      el.textContent = `${totalC}/${totalC} clienti mappati`;
+    }
   }
 }
 
 async function startGeocoding() {
   try {
+    unmappedClients = [];
     // Raggruppa per indirizzo completo (via, CAP, città, prov) — solo segmenti da mappare
     const addrMap = {};
     mapClients().forEach(c => {
       const geo = buildGeoQuery(c);
-      if (!geo) return;
-      if (!addrMap[geo.cacheKey]) addrMap[geo.cacheKey] = { query: geo.query, clients: [] };
+      if (!geo) { unmappedClients.push(c); return; }
+      if (!addrMap[geo.cacheKey]) {
+        addrMap[geo.cacheKey] = {
+          query: geo.query,
+          fallbackQuery: geo.fallbackQuery,
+          fallbackCacheKey: geo.fallbackCacheKey,
+          clients: []
+        };
+      }
       addrMap[geo.cacheKey].clients.push(c);
     });
 
@@ -2011,16 +2037,42 @@ async function startGeocoding() {
 
     for (let i = 0; i < toGeocode.length; i++) {
       const [key, group] = toGeocode[i];
-      const coords = await geocodeQuery(group.query);
+      let coords = await geocodeQuery(group.query);
+
+      // Fallback: se l'indirizzo completo non viene trovato, riprova senza via/numero
+      // (posizione approssimata su CAP+città+provincia, meglio di niente)
+      if (!coords && group.fallbackCacheKey) {
+        if (geocodeCache[group.fallbackCacheKey]) {
+          coords = geocodeCache[group.fallbackCacheKey];
+        } else {
+          await sleep(1100);
+          coords = await geocodeQuery(group.fallbackQuery);
+          if (coords) {
+            geocodeCache[group.fallbackCacheKey] = coords;
+            saveGeocodeCache();
+          }
+        }
+      }
+
       if (coords) {
         geocodeCache[key] = coords;
         saveGeocodeCache();
         plotClients(group.clients, coords);
+      } else {
+        unmappedClients.push(...group.clients);
       }
       updateMapStatus(toGeocode.length - i - 1, toGeocode.length);
       await sleep(1100);
     }
     updateMapStatus(0, toGeocode.length);
+
+    if (unmappedClients.length > 0) {
+      console.warn(`${unmappedClients.length} clienti non geocodificati (indirizzo non riconosciuto):`,
+        unmappedClients.map(c => ({
+          cod: c['COD.'], cliente: c['CLIENTE'], indirizzo: c['INDIRIZZO'],
+          cap: c['CAP'], citta: c["CITTA'"], pr: c['PR']
+        })));
+    }
   } catch(e) {
     console.error('Errore durante geocoding:', e);
     const el = document.getElementById('map-status');
