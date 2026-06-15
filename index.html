@@ -463,6 +463,16 @@
   }
   .field-input:focus { border-color: var(--col-teal); background: #fff; }
 
+  .field-link {
+    font-size: 13px;
+    color: var(--col-teal-dark);
+    text-align: right;
+    word-break: break-word;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .field-link:hover { text-decoration: underline; }
+
   .product-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1528,6 +1538,8 @@ function showDetail(c) {
 
   const visita26 = c['VISITA 2026'] || '';
   const nVisite = c['N. VISITE'] || '';
+  const addressDisplay = formatAddressDisplay(c);
+  const mapsLink = buildMapsLink(c);
 
   det.innerHTML = `
     <div class="detail-header">
@@ -1565,6 +1577,12 @@ function showDetail(c) {
       ${fieldRow('Listino', c['LISTINO 26'] || '—', false)}
       ${fieldRow('Range', c['RANGE'] || '—', false)}
       ${fieldRow('Nome', c['NOME'] || '—', false)}
+      <div class="field-row">
+        <span class="field-label">Indirizzo</span>
+        ${mapsLink
+          ? `<a class="field-link" href="${mapsLink}" target="_blank">${addressDisplay || '—'} 🧭</a>`
+          : `<span class="field-value">${addressDisplay || '—'}</span>`}
+      </div>
     </div>
 
     <div class="detail-section">
@@ -1935,6 +1953,31 @@ function buildGeoQuery(c) {
     result.fallbackQuery = fbParts.join(', ');
   }
   return result;
+}
+
+// Indirizzo formattato per visualizzazione e link Google Maps per la navigazione
+function formatAddressDisplay(c) {
+  const indirizzo = (c['INDIRIZZO'] || '').trim();
+  const cap = (c['CAP'] || '').toString().trim();
+  const citta = (c["CITTA'"] || '').trim();
+  const pr = (c['PR'] || '').trim();
+  const capCitta = [cap, citta].filter(Boolean).join(' ');
+  const parts = [indirizzo, capCitta, pr].filter(Boolean);
+  return parts.length ? parts.join(', ') : '';
+}
+function buildMapsLink(c) {
+  const indirizzo = (c['INDIRIZZO'] || '').trim();
+  const cap = (c['CAP'] || '').toString().trim();
+  const citta = fixCityName((c["CITTA'"] || '').trim());
+  const pr = (c['PR'] || '').trim();
+  if (!indirizzo && !citta) return null;
+  const parts = [];
+  if (indirizzo) parts.push(indirizzo);
+  if (cap) parts.push(cap);
+  if (citta) parts.push(citta);
+  if (pr) parts.push(pr);
+  parts.push('Italia');
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(parts.join(', '))}`;
 }
 
 async function geocodeQuery(query, mod) {
