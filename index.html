@@ -660,11 +660,42 @@
     overflow: hidden;
   }
   #map-view.visible { display: flex; }
+  .map-tabs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px 0;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--col-border);
+  }
+  .map-tab {
+    padding: 8px 16px;
+    border: none;
+    background: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--col-text-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .map-tab.active {
+    color: var(--col-teal-dark);
+    border-bottom-color: var(--col-teal);
+  }
+  .map-tab-content {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+  }
+  .map-tab-content.active { display: flex; }
   #map-view .dash-topbar {
     padding: 16px 20px 0;
     margin-bottom: 12px;
   }
-  #map-legend {
+  #map-legend, #map-tools-legend {
     padding: 0 20px 12px;
     flex-shrink: 0;
   }
@@ -694,7 +725,7 @@
     flex-shrink: 0;
   }
   .map-legend-item.off { opacity: 0.35; }
-  #map-container {
+  #map-container, #map-tools-container {
     flex: 1;
     min-height: 0;
   }
@@ -954,8 +985,9 @@
     .dash-table { font-size: 11px; }
 
     /* Mappa */
+    .map-tabs { padding: 8px 12px 0; }
     #map-view .dash-topbar { padding: 12px 12px 0; flex-wrap: wrap; }
-    #map-legend { padding: 0 12px 10px; }
+    #map-legend, #map-tools-legend { padding: 0 12px 10px; }
     .map-legend-item { font-size: 11px; padding: 4px 8px; }
   }
 
@@ -1149,19 +1181,40 @@
   </div>
 
   <div id="map-view">
-    <div class="dash-topbar">
+    <div class="map-tabs">
       <button class="hamburger-btn-mobile" aria-label="Menu">☰</button>
-      <div style="flex:1">
-        <div class="dash-title">Mappa clienti</div>
-        <div class="dash-subtitle" id="map-status">—</div>
+      <button class="map-tab active" data-tab="visite" onclick="switchMapTab('visite')">📍 Visite</button>
+      <button class="map-tab" data-tab="tools" onclick="switchMapTab('tools')">🔧 Tool TPMS</button>
+    </div>
+
+    <div id="map-tab-visite" class="map-tab-content active">
+      <div class="dash-topbar">
+        <div style="flex:1">
+          <div class="dash-title">Mappa clienti — Visite</div>
+          <div class="dash-subtitle" id="map-status">—</div>
+        </div>
+        <button class="btn" id="btn-map-reset-hidden">↺ Mostra tutti</button>
+        <button class="btn btn-primary" id="btn-map-retry">⟳ Riprova</button>
       </div>
-      <button class="btn" id="btn-map-reset-hidden">↺ Mostra tutti</button>
-      <button class="btn btn-primary" id="btn-map-retry">⟳ Riprova</button>
+      <div id="map-legend">
+        <div class="map-legend-items" id="map-legend-items"></div>
+      </div>
+      <div id="map-container"></div>
     </div>
-    <div id="map-legend">
-      <div class="map-legend-items" id="map-legend-items"></div>
+
+    <div id="map-tab-tools" class="map-tab-content">
+      <div class="dash-topbar">
+        <div style="flex:1">
+          <div class="dash-title">Mappa clienti — Tool Autel / Ateq</div>
+          <div class="dash-subtitle" id="map-tools-status">—</div>
+        </div>
+        <button class="btn btn-primary" id="btn-map-tools-retry">⟳ Riprova</button>
+      </div>
+      <div id="map-tools-legend" class="map-legend-wrap">
+        <div class="map-legend-items" id="map-tools-legend-items"></div>
+      </div>
+      <div id="map-tools-container"></div>
     </div>
-    <div id="map-container"></div>
   </div>
 </div>
 
@@ -1215,23 +1268,33 @@ let selectedIndex = null;
 let selectedRow = null;
 let pendingEdits = {};
 
-// Mappa
-let mapInstance = null;
-let mapLayers = {};
-let geocodeCache = null;
-let geocodingInProgress = false;
-let geoOkCount = 0;
-let geoFailCount = 0;
-let unmappedClients = [];
-let hiddenClients = new Set();
-let clientMarkers = {};
+// Mappa - configurazione condivisa
 const GEOCODE_CACHE_KEY = 'mak_geocache_v2';
-const HIDDEN_MAP_KEY = 'mak_map_hidden_v1';
-// Sulla mappa mostriamo solo i clienti da "lavorare": non interessati,
+// Mappa "Visite": solo i clienti da "lavorare" — non interessati,
 // in calo, dormienti e senza visita
 const MAP_PROG26_KEYS = ['NONINT', 'OK24NO25', 'OK25NOVIS', 'DORMIENTI'];
 function mapClients() {
   return allClients.filter(c => MAP_PROG26_KEYS.includes((c['PROG26'] || '').trim().toUpperCase()));
+}
+
+// Mappa "Tool TPMS": tutti i clienti con tool Autel e/o Ateq
+const TOOL_CATEGORIES = {
+  'AUTEL':    { label: 'Autel',        bg: '#E3F0FC', color: '#1565C0' },
+  'ATEQ':     { label: 'Ateq',         bg: '#FBE6E6', color: '#C62828' },
+  'ENTRAMBI': { label: 'Autel + Ateq', bg: '#F1E4F8', color: '#6A1B9A' },
+};
+const TOOL_CATEGORY_KEYS = ['AUTEL', 'ATEQ', 'ENTRAMBI'];
+function toolCategoryKey(c) {
+  const t = (c['TOOL'] || '').toUpperCase();
+  const hasAutel = t.includes('AUTEL');
+  const hasAteq = t.includes('ATEQ');
+  if (hasAutel && hasAteq) return 'ENTRAMBI';
+  if (hasAutel) return 'AUTEL';
+  if (hasAteq) return 'ATEQ';
+  return null;
+}
+function toolMapClients() {
+  return allClients.filter(c => toolCategoryKey(c) !== null);
 }
 
 // ─── PROG26 CONFIG ────────────────────────────────────────────────
@@ -1804,32 +1867,6 @@ function renderDashboard() {
 }
 
 // ─── MAPPA ──────────────────────────────────────────────────────────
-function loadGeocodeCache() {
-  let cache = {};
-  try { cache = JSON.parse(localStorage.getItem(GEOCODE_CACHE_KEY) || '{}'); } catch(e) { cache = {}; }
-  // Rimuove eventuali voci con coordinate non valide (NaN, mancanti, ecc.)
-  Object.keys(cache).forEach(key => {
-    const v = cache[key];
-    if (!v || typeof v.lat !== 'number' || typeof v.lng !== 'number' || !isFinite(v.lat) || !isFinite(v.lng)) {
-      delete cache[key];
-    }
-  });
-  return cache;
-}
-function saveGeocodeCache() {
-  try { localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(geocodeCache)); } catch(e) {}
-}
-
-function loadHiddenClients() {
-  try {
-    const arr = JSON.parse(localStorage.getItem(HIDDEN_MAP_KEY) || '[]');
-    return new Set(arr.map(String));
-  } catch(e) { return new Set(); }
-}
-function saveHiddenClients() {
-  try { localStorage.setItem(HIDDEN_MAP_KEY, JSON.stringify(Array.from(hiddenClients))); } catch(e) {}
-}
-
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // Offset deterministico (basato sul codice cliente) per separare visivamente
@@ -1900,142 +1937,7 @@ function buildGeoQuery(c) {
   return result;
 }
 
-function initMapView() {
-  if (mapInstance) return;
-
-  try {
-    mapInstance = L.map('map-container', { preferCanvas: true }).setView([45.50, 9.30], 10);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 18,
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(mapInstance);
-
-    Object.keys(PROG26_CONFIG).forEach(key => {
-      if (MAP_PROG26_KEYS.includes(key)) {
-        mapLayers[key] = L.layerGroup().addTo(mapInstance);
-      }
-    });
-
-    hiddenClients = loadHiddenClients();
-    renderMapLegend();
-    geocodeCache = loadGeocodeCache();
-    startGeocoding();
-  } catch(e) {
-    console.error('Errore inizializzazione mappa:', e);
-    const el = document.getElementById('map-status');
-    if (el) el.textContent = '⚠ Errore inizializzazione mappa: ' + e.message;
-  }
-}
-
-function renderMapLegend() {
-  const counts = {};
-  mapClients().forEach(c => {
-    if (hiddenClients.has(String(c['COD.']))) return;
-    const key = (c['PROG26'] || '').trim().toUpperCase();
-    counts[key] = (counts[key] || 0) + 1;
-  });
-
-  document.getElementById('map-legend-items').innerHTML = MAP_PROG26_KEYS.map(key => {
-    const pc = PROG26_CONFIG[key];
-    const n = counts[key] || 0;
-    return `<div class="map-legend-item" data-key="${key}" onclick="toggleMapLayer('${key}', this)">
-      <span class="dot" style="background:${pc.color}"></span>${pc.label} (${n})
-    </div>`;
-  }).join('');
-}
-
-function toggleMapLayer(key, el) {
-  const layer = mapLayers[key];
-  if (!layer || !mapInstance) return;
-  if (mapInstance.hasLayer(layer)) {
-    mapInstance.removeLayer(layer);
-    el.classList.add('off');
-  } else {
-    mapInstance.addLayer(layer);
-    el.classList.remove('off');
-  }
-}
-
-function buildMapPopup(c, pc) {
-  const cod = escJs(c['COD.']);
-  return `
-    <div class="map-popup-name">${c['CLIENTE'] || '—'}</div>
-    <div class="map-popup-meta">${c['TIPO'] || ''} ${c['TIPO'] && c['NETWORK'] ? '·' : ''} ${c['NETWORK'] || ''} — ${c["CITTA'"] || ''}</div>
-    <div class="map-popup-pill" style="background:${pc.bg};color:${pc.color}">${pc.label}</div>
-    <div class="map-popup-fat">Fat. 2025: <strong>${formatFat(c['2025'])}</strong> · 2026: <strong>${formatFat(c['2026'])}</strong></div>
-    <button class="map-popup-btn" onclick="goToClient('${cod}')">Apri scheda</button>
-    <button class="map-popup-btn map-popup-btn-visited" onclick="hideClientFromMap('${cod}')">✓ Visitato — rimuovi dalla mappa</button>
-  `;
-}
-
-function plotClients(clients, baseCoords) {
-  if (!baseCoords || typeof baseCoords.lat !== 'number' || typeof baseCoords.lng !== 'number' ||
-      !isFinite(baseCoords.lat) || !isFinite(baseCoords.lng)) {
-    console.warn('plotClients: coordinate base non valide', baseCoords);
-    return;
-  }
-  clients.forEach(c => {
-    try {
-      const cod = String(c['COD.'] || '');
-      if (hiddenClients.has(cod)) return;
-      const key = (c['PROG26'] || '').trim().toUpperCase();
-      if (!mapLayers[key]) return;
-      const pc = PROG26_CONFIG[key] || PROG26_CONFIG[''];
-      const off = hashOffset(c['COD.'] || c['CLIENTE'] || '');
-      const lat = baseCoords.lat + off.dy;
-      const lng = baseCoords.lng + off.dx;
-      if (!isFinite(lat) || !isFinite(lng)) return;
-
-      const marker = L.circleMarker([lat, lng], {
-        radius: 6,
-        color: '#fff',
-        weight: 1.5,
-        fillColor: pc.color,
-        fillOpacity: 0.85
-      });
-      marker.bindPopup(buildMapPopup(c, pc));
-      marker.addTo(mapLayers[key]);
-      if (cod) clientMarkers[cod] = { marker, layerKey: key };
-    } catch(e) {
-      console.error('Errore plotting cliente', c['COD.'], e);
-    }
-  });
-}
-
-function hideClientFromMap(cod) {
-  cod = String(cod || '');
-  if (!cod) return;
-  hiddenClients.add(cod);
-  saveHiddenClients();
-  const entry = clientMarkers[cod];
-  if (entry && mapLayers[entry.layerKey]) {
-    mapLayers[entry.layerKey].removeLayer(entry.marker);
-  }
-  delete clientMarkers[cod];
-  renderMapLegend();
-  updateMapStatus(0, 0);
-  showToast('Cliente segnato come visitato e rimosso dalla mappa.');
-}
-
-function resetHiddenClients() {
-  if (hiddenClients.size === 0) {
-    showToast('Nessun cliente nascosto da ripristinare.');
-    return;
-  }
-  if (!confirm(`Vuoi far tornare visibili sulla mappa tutti i ${hiddenClients.size} clienti segnati come visitati?`)) return;
-  hiddenClients.clear();
-  saveHiddenClients();
-  if (mapInstance) {
-    Object.values(mapLayers).forEach(layer => layer.clearLayers());
-    clientMarkers = {};
-    geocodingInProgress = false;
-    startGeocoding();
-  }
-  renderMapLegend();
-  showToast('Ripristinati tutti i clienti sulla mappa.');
-}
-
-async function geocodeQuery(query) {
+async function geocodeQuery(query, mod) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 8000);
   try {
@@ -2045,149 +1947,377 @@ async function geocodeQuery(query) {
     clearTimeout(timeoutId);
     if (!res.ok) {
       console.warn('Geocode HTTP', res.status, query);
-      geoFailCount++;
+      mod.geoFailCount++;
       return null;
     }
     const data = await res.json();
     if (data && data[0]) {
-      geoOkCount++;
+      mod.geoOkCount++;
       return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
     }
     console.warn('Geocode: nessun risultato per', query);
-    geoFailCount++;
+    mod.geoFailCount++;
   } catch(e) {
     clearTimeout(timeoutId);
     if (e.name === 'AbortError') console.warn('Geocode timeout per', query);
     else console.error('Geocode errore fetch:', e, 'query:', query);
-    geoFailCount++;
+    mod.geoFailCount++;
   }
   return null;
 }
 
-function updateMapStatus(remaining, total) {
-  const el = document.getElementById('map-status');
-  if (!el) return;
-  const clients = mapClients();
-  if (remaining > 0) {
-    el.textContent = `Geocoding in corso… ${total - remaining}/${total} indirizzi (ok: ${geoOkCount}, falliti: ${geoFailCount})`;
-  } else if (total > 0 && geoOkCount === 0 && geoFailCount > 0 && unmappedClients.length === clients.length) {
-    el.textContent = `⚠ Geocoding fallito per tutti gli indirizzi (${geoFailCount}). Il servizio potrebbe essere temporaneamente bloccato — premi "Riprova" più tardi.`;
-  } else {
-    const totalC = clients.length;
-    const unmapped = unmappedClients.length;
-    const visited = clients.filter(c => hiddenClients.has(String(c['COD.']))).length;
-    const onMap = totalC - unmapped - visited;
-    let msg = `${onMap} clienti da visitare sulla mappa`;
-    if (visited > 0) msg += ` · ${visited} già visitati`;
-    if (unmapped > 0) msg += ` · ${unmapped} non geocodificati (console)`;
-    el.textContent = msg;
+// ─── MAPPA: modulo riutilizzabile (geocoding + plotting) ────────────
+// Ogni istanza gestisce la propria mappa Leaflet, i propri layer/categorie
+// e il proprio set di "nascosti", ma tutte condividono la stessa cache
+// di geocodifica per indirizzo (mak_geocache_v2) per non geocodificare
+// due volte lo stesso indirizzo.
+class MapModule {
+  constructor(cfg) {
+    this.cfg = cfg;
+    this.mapInstance = null;
+    this.mapLayers = {};
+    this.geocodeCache = null;
+    this.geocodingInProgress = false;
+    this.geoOkCount = 0;
+    this.geoFailCount = 0;
+    this.unmappedClients = [];
+    this.hiddenClients = new Set();
+    this.clientMarkers = {};
   }
-}
 
-async function startGeocoding() {
-  try {
-    unmappedClients = [];
-    // Raggruppa per indirizzo completo (via, CAP, città, prov) — solo segmenti da mappare
-    const addrMap = {};
-    mapClients().forEach(c => {
-      const geo = buildGeoQuery(c);
-      if (!geo) { unmappedClients.push(c); return; }
-      if (!addrMap[geo.cacheKey]) {
-        addrMap[geo.cacheKey] = {
-          query: geo.query,
-          fallbackQuery: geo.fallbackQuery,
-          fallbackCacheKey: geo.fallbackCacheKey,
-          clients: []
-        };
-      }
-      addrMap[geo.cacheKey].clients.push(c);
-    });
+  clients() { return this.cfg.getClients(); }
 
-    const toGeocode = [];
-    Object.entries(addrMap).forEach(([key, group]) => {
-      if (geocodeCache[key]) {
-        plotClients(group.clients, geocodeCache[key]);
-      } else {
-        toGeocode.push([key, group]);
+  loadGeocodeCache() {
+    let cache = {};
+    try { cache = JSON.parse(localStorage.getItem(this.cfg.geocodeCacheKey) || '{}'); } catch(e) { cache = {}; }
+    Object.keys(cache).forEach(key => {
+      const v = cache[key];
+      if (!v || typeof v.lat !== 'number' || typeof v.lng !== 'number' || !isFinite(v.lat) || !isFinite(v.lng)) {
+        delete cache[key];
       }
     });
+    return cache;
+  }
+  saveGeocodeCache() {
+    try { localStorage.setItem(this.cfg.geocodeCacheKey, JSON.stringify(this.geocodeCache)); } catch(e) {}
+  }
+  loadHiddenClients() {
+    if (!this.cfg.hiddenStorageKey) return new Set();
+    try {
+      const arr = JSON.parse(localStorage.getItem(this.cfg.hiddenStorageKey) || '[]');
+      return new Set(arr.map(String));
+    } catch(e) { return new Set(); }
+  }
+  saveHiddenClients() {
+    if (!this.cfg.hiddenStorageKey) return;
+    try { localStorage.setItem(this.cfg.hiddenStorageKey, JSON.stringify(Array.from(this.hiddenClients))); } catch(e) {}
+  }
 
-    updateMapStatus(toGeocode.length, toGeocode.length);
+  init() {
+    if (this.mapInstance) return;
+    try {
+      this.mapInstance = L.map(this.cfg.containerId, { preferCanvas: true }).setView([45.50, 9.30], 10);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(this.mapInstance);
 
-    if (toGeocode.length === 0 || geocodingInProgress) {
-      if (toGeocode.length === 0) updateMapStatus(0, 0);
+      this.cfg.categoryOrder.forEach(key => {
+        this.mapLayers[key] = L.layerGroup().addTo(this.mapInstance);
+      });
+
+      this.hiddenClients = this.loadHiddenClients();
+      this.renderLegend();
+      this.geocodeCache = this.loadGeocodeCache();
+      this.startGeocoding();
+    } catch(e) {
+      console.error('Errore inizializzazione mappa:', e);
+      const el = document.getElementById(this.cfg.statusId);
+      if (el) el.textContent = '⚠ Errore inizializzazione mappa: ' + e.message;
+    }
+  }
+
+  renderLegend() {
+    const counts = {};
+    this.clients().forEach(c => {
+      if (this.hiddenClients.has(String(c['COD.']))) return;
+      const key = this.cfg.getCategoryKey(c);
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    document.getElementById(this.cfg.legendId).innerHTML = this.cfg.categoryOrder.map(key => {
+      const pc = this.cfg.categories[key];
+      const n = counts[key] || 0;
+      return `<div class="map-legend-item" data-key="${key}" onclick="${this.cfg.varName}.toggleLayer('${key}', this)">
+        <span class="dot" style="background:${pc.color}"></span>${pc.label} (${n})
+      </div>`;
+    }).join('');
+  }
+
+  toggleLayer(key, el) {
+    const layer = this.mapLayers[key];
+    if (!layer || !this.mapInstance) return;
+    if (this.mapInstance.hasLayer(layer)) {
+      this.mapInstance.removeLayer(layer);
+      el.classList.add('off');
+    } else {
+      this.mapInstance.addLayer(layer);
+      el.classList.remove('off');
+    }
+  }
+
+  buildPopup(c, pc) {
+    const cod = escJs(c['COD.']);
+    let html = `
+      <div class="map-popup-name">${c['CLIENTE'] || '—'}</div>
+      <div class="map-popup-meta">${c['TIPO'] || ''} ${c['TIPO'] && c['NETWORK'] ? '·' : ''} ${c['NETWORK'] || ''} — ${c["CITTA'"] || ''}</div>
+      <div class="map-popup-pill" style="background:${pc.bg};color:${pc.color}">${pc.label}</div>
+    `;
+    if (this.cfg.popupExtra) html += this.cfg.popupExtra(c);
+    html += `<button class="map-popup-btn" onclick="goToClient('${cod}')">Apri scheda</button>`;
+    if (this.cfg.supportHide) {
+      html += `<button class="map-popup-btn map-popup-btn-visited" onclick="${this.cfg.varName}.hideClient('${cod}')">✓ Visitato — rimuovi dalla mappa</button>`;
+    }
+    return html;
+  }
+
+  plotClients(clients, baseCoords) {
+    if (!baseCoords || typeof baseCoords.lat !== 'number' || typeof baseCoords.lng !== 'number' ||
+        !isFinite(baseCoords.lat) || !isFinite(baseCoords.lng)) {
+      console.warn('plotClients: coordinate base non valide', baseCoords);
       return;
     }
-    geocodingInProgress = true;
+    clients.forEach(c => {
+      try {
+        const cod = String(c['COD.'] || '');
+        if (this.hiddenClients.has(cod)) return;
+        const key = this.cfg.getCategoryKey(c);
+        if (!this.mapLayers[key]) return;
+        const pc = this.cfg.categories[key];
+        const off = hashOffset(c['COD.'] || c['CLIENTE'] || '');
+        const lat = baseCoords.lat + off.dy;
+        const lng = baseCoords.lng + off.dx;
+        if (!isFinite(lat) || !isFinite(lng)) return;
 
-    for (let i = 0; i < toGeocode.length; i++) {
-      const [key, group] = toGeocode[i];
-      let coords = await geocodeQuery(group.query);
+        const marker = L.circleMarker([lat, lng], {
+          radius: 6,
+          color: '#fff',
+          weight: 1.5,
+          fillColor: pc.color,
+          fillOpacity: 0.85
+        });
+        marker.bindPopup(this.buildPopup(c, pc));
+        marker.addTo(this.mapLayers[key]);
+        if (cod) this.clientMarkers[cod] = { marker, layerKey: key };
+      } catch(e) {
+        console.error('Errore plotting cliente', c['COD.'], e);
+      }
+    });
+  }
 
-      // Fallback: se l'indirizzo completo non viene trovato, riprova senza via/numero
-      // (posizione approssimata su CAP+città+provincia, meglio di niente)
-      if (!coords && group.fallbackCacheKey) {
-        if (geocodeCache[group.fallbackCacheKey]) {
-          coords = geocodeCache[group.fallbackCacheKey];
+  hideClient(cod) {
+    cod = String(cod || '');
+    if (!cod) return;
+    this.hiddenClients.add(cod);
+    this.saveHiddenClients();
+    const entry = this.clientMarkers[cod];
+    if (entry && this.mapLayers[entry.layerKey]) {
+      this.mapLayers[entry.layerKey].removeLayer(entry.marker);
+    }
+    delete this.clientMarkers[cod];
+    this.renderLegend();
+    this.updateStatus(0, 0);
+    showToast('Cliente segnato come visitato e rimosso dalla mappa.');
+  }
+
+  resetHidden() {
+    if (this.hiddenClients.size === 0) {
+      showToast('Nessun cliente nascosto da ripristinare.');
+      return;
+    }
+    if (!confirm(`Vuoi far tornare visibili sulla mappa tutti i ${this.hiddenClients.size} clienti segnati come visitati?`)) return;
+    this.hiddenClients.clear();
+    this.saveHiddenClients();
+    if (this.mapInstance) {
+      Object.values(this.mapLayers).forEach(layer => layer.clearLayers());
+      this.clientMarkers = {};
+      this.geocodingInProgress = false;
+      this.startGeocoding();
+    }
+    this.renderLegend();
+    showToast('Ripristinati tutti i clienti sulla mappa.');
+  }
+
+  async startGeocoding() {
+    try {
+      this.unmappedClients = [];
+      const addrMap = {};
+      this.clients().forEach(c => {
+        const geo = buildGeoQuery(c);
+        if (!geo) { this.unmappedClients.push(c); return; }
+        if (!addrMap[geo.cacheKey]) {
+          addrMap[geo.cacheKey] = {
+            query: geo.query,
+            fallbackQuery: geo.fallbackQuery,
+            fallbackCacheKey: geo.fallbackCacheKey,
+            clients: []
+          };
+        }
+        addrMap[geo.cacheKey].clients.push(c);
+      });
+
+      const toGeocode = [];
+      Object.entries(addrMap).forEach(([key, group]) => {
+        if (this.geocodeCache[key]) {
+          this.plotClients(group.clients, this.geocodeCache[key]);
         } else {
-          await sleep(1100);
-          coords = await geocodeQuery(group.fallbackQuery);
-          if (coords) {
-            geocodeCache[group.fallbackCacheKey] = coords;
-            saveGeocodeCache();
+          toGeocode.push([key, group]);
+        }
+      });
+
+      this.updateStatus(toGeocode.length, toGeocode.length);
+
+      if (toGeocode.length === 0 || this.geocodingInProgress) {
+        if (toGeocode.length === 0) this.updateStatus(0, 0);
+        return;
+      }
+      this.geocodingInProgress = true;
+
+      for (let i = 0; i < toGeocode.length; i++) {
+        const [key, group] = toGeocode[i];
+        let coords = await geocodeQuery(group.query, this);
+
+        // Fallback: se l'indirizzo completo non viene trovato, riprova senza via/numero
+        // (posizione approssimata su CAP+città+provincia, meglio di niente)
+        if (!coords && group.fallbackCacheKey) {
+          if (this.geocodeCache[group.fallbackCacheKey]) {
+            coords = this.geocodeCache[group.fallbackCacheKey];
+          } else {
+            await sleep(1100);
+            coords = await geocodeQuery(group.fallbackQuery, this);
+            if (coords) {
+              this.geocodeCache[group.fallbackCacheKey] = coords;
+              this.saveGeocodeCache();
+            }
           }
         }
-      }
 
-      if (coords) {
-        geocodeCache[key] = coords;
-        saveGeocodeCache();
-        plotClients(group.clients, coords);
-      } else {
-        unmappedClients.push(...group.clients);
+        if (coords) {
+          this.geocodeCache[key] = coords;
+          this.saveGeocodeCache();
+          this.plotClients(group.clients, coords);
+        } else {
+          this.unmappedClients.push(...group.clients);
+        }
+        this.updateStatus(toGeocode.length - i - 1, toGeocode.length);
+        await sleep(1100);
       }
-      updateMapStatus(toGeocode.length - i - 1, toGeocode.length);
-      await sleep(1100);
-    }
-    updateMapStatus(0, toGeocode.length);
+      this.updateStatus(0, toGeocode.length);
 
-    if (unmappedClients.length > 0) {
-      console.warn(`${unmappedClients.length} clienti non geocodificati (indirizzo non riconosciuto):`,
-        unmappedClients.map(c => ({
-          cod: c['COD.'], cliente: c['CLIENTE'], indirizzo: c['INDIRIZZO'],
-          cap: c['CAP'], citta: c["CITTA'"], pr: c['PR']
-        })));
+      if (this.unmappedClients.length > 0) {
+        console.warn(`[${this.cfg.id}] ${this.unmappedClients.length} clienti non geocodificati (indirizzo non riconosciuto):`,
+          this.unmappedClients.map(c => ({
+            cod: c['COD.'], cliente: c['CLIENTE'], indirizzo: c['INDIRIZZO'],
+            cap: c['CAP'], citta: c["CITTA'"], pr: c['PR']
+          })));
+      }
+    } catch(e) {
+      console.error('Errore durante geocoding:', e);
+      const el = document.getElementById(this.cfg.statusId);
+      if (el) el.textContent = '⚠ Errore durante il geocoding: ' + e.message + ' (vedi console)';
+    } finally {
+      this.geocodingInProgress = false;
     }
-  } catch(e) {
-    console.error('Errore durante geocoding:', e);
-    const el = document.getElementById('map-status');
-    if (el) el.textContent = '⚠ Errore durante il geocoding: ' + e.message + ' (vedi console)';
-  } finally {
-    geocodingInProgress = false;
+  }
+
+  retryGeocoding() {
+    if (this.geocodingInProgress) {
+      showToast('Geocoding già in corso…');
+      return;
+    }
+    if (!this.mapInstance) return;
+    try {
+      this.geoOkCount = 0;
+      this.geoFailCount = 0;
+      Object.values(this.mapLayers).forEach(layer => layer.clearLayers());
+      this.startGeocoding();
+    } catch(e) {
+      console.error('Errore retry geocoding:', e);
+      const el = document.getElementById(this.cfg.statusId);
+      if (el) el.textContent = '⚠ Errore: ' + e.message + ' (vedi console)';
+    }
+  }
+
+  updateStatus(remaining, total) {
+    const el = document.getElementById(this.cfg.statusId);
+    if (!el) return;
+    const clients = this.clients();
+    if (remaining > 0) {
+      el.textContent = `Geocoding in corso… ${total - remaining}/${total} indirizzi (ok: ${this.geoOkCount}, falliti: ${this.geoFailCount})`;
+    } else if (total > 0 && this.geoOkCount === 0 && this.geoFailCount > 0 && this.unmappedClients.length === clients.length) {
+      el.textContent = `⚠ Geocoding fallito per tutti gli indirizzi (${this.geoFailCount}). Il servizio potrebbe essere temporaneamente bloccato — premi "Riprova" più tardi.`;
+    } else {
+      const totalC = clients.length;
+      const unmapped = this.unmappedClients.length;
+      const hidden = clients.filter(c => this.hiddenClients.has(String(c['COD.']))).length;
+      const onMap = totalC - unmapped - hidden;
+      let msg = this.cfg.supportHide
+        ? `${onMap} clienti da visitare sulla mappa`
+        : `${onMap} clienti sulla mappa`;
+      if (this.cfg.supportHide && hidden > 0) msg += ` · ${hidden} già visitati`;
+      if (unmapped > 0) msg += ` · ${unmapped} non geocodificati (console)`;
+      el.textContent = msg;
+    }
   }
 }
 
-function retryGeocoding() {
-  if (geocodingInProgress) {
-    showToast('Geocoding già in corso…');
-    return;
-  }
-  if (!mapInstance) return;
-  try {
-    geoOkCount = 0;
-    geoFailCount = 0;
-    // Svuota i layer esistenti per evitare pin duplicati
-    Object.values(mapLayers).forEach(layer => layer.clearLayers());
-    startGeocoding();
-  } catch(e) {
-    console.error('Errore retry geocoding:', e);
-    const el = document.getElementById('map-status');
-    if (el) el.textContent = '⚠ Errore: ' + e.message + ' (vedi console)';
-  }
-}
+// ─── Istanze mappe ───────────────────────────────────────────────
+const visitMap = new MapModule({
+  id: 'visite',
+  varName: 'visitMap',
+  containerId: 'map-container',
+  legendId: 'map-legend-items',
+  statusId: 'map-status',
+  geocodeCacheKey: GEOCODE_CACHE_KEY,
+  hiddenStorageKey: 'mak_map_hidden_v1',
+  supportHide: true,
+  categories: PROG26_CONFIG,
+  categoryOrder: MAP_PROG26_KEYS,
+  getCategoryKey: c => (c['PROG26'] || '').trim().toUpperCase(),
+  getClients: mapClients,
+  popupExtra: c => `<div class="map-popup-fat">Fat. 2025: <strong>${formatFat(c['2025'])}</strong> · 2026: <strong>${formatFat(c['2026'])}</strong></div>`
+});
 
-document.getElementById('btn-map-retry').addEventListener('click', retryGeocoding);
-document.getElementById('btn-map-reset-hidden').addEventListener('click', resetHiddenClients);
+const toolMap = new MapModule({
+  id: 'tool',
+  varName: 'toolMap',
+  containerId: 'map-tools-container',
+  legendId: 'map-tools-legend-items',
+  statusId: 'map-tools-status',
+  geocodeCacheKey: GEOCODE_CACHE_KEY,
+  hiddenStorageKey: null,
+  supportHide: false,
+  categories: TOOL_CATEGORIES,
+  categoryOrder: TOOL_CATEGORY_KEYS,
+  getCategoryKey: c => toolCategoryKey(c),
+  getClients: toolMapClients,
+  popupExtra: c => `<div class="map-popup-fat">Tool: <strong>${c['TOOL'] || ''}</strong></div>`
+});
+
+document.getElementById('btn-map-retry').addEventListener('click', () => visitMap.retryGeocoding());
+document.getElementById('btn-map-reset-hidden').addEventListener('click', () => visitMap.resetHidden());
+document.getElementById('btn-map-tools-retry').addEventListener('click', () => toolMap.retryGeocoding());
+
+function switchMapTab(tab) {
+  document.querySelectorAll('.map-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.getElementById('map-tab-visite').classList.toggle('active', tab === 'visite');
+  document.getElementById('map-tab-tools').classList.toggle('active', tab === 'tools');
+  if (tab === 'visite') visitMap.init();
+  else toolMap.init();
+  setTimeout(() => {
+    if (tab === 'visite' && visitMap.mapInstance) visitMap.mapInstance.invalidateSize();
+    if (tab === 'tools' && toolMap.mapInstance) toolMap.mapInstance.invalidateSize();
+  }, 50);
+}
 
 function goToClient(codice) {
   // Torna alla vista clienti
@@ -2250,8 +2380,8 @@ document.querySelectorAll('.nav-main-item').forEach(el => {
 
     if (view === 'dashboard') renderDashboard();
     if (view === 'mappe') {
-      initMapView();
-      setTimeout(() => { if (mapInstance) mapInstance.invalidateSize(); }, 50);
+      const activeTab = document.querySelector('.map-tab.active')?.dataset.tab || 'visite';
+      switchMapTab(activeTab);
     }
     closeSidebar();
   });
