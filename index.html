@@ -1823,9 +1823,33 @@ function hashOffset(str) {
   return { dx: Math.cos(angle) * r, dy: Math.sin(angle) * r };
 }
 
+// Correzioni nomi comuni per la geocodifica: l'anagrafica contiene errori/troncamenti
+// (probabile retaggio di un vecchio export con campo CITTA' troncato a 20 caratteri)
+// che impediscono a OpenStreetMap di trovare l'indirizzo. Non modifica i dati originali,
+// serve solo per costruire la query di geocoding.
+const CITY_NAME_FIXES = {
+  "CORNATE DADDA": "Cornate d'Adda",
+  "CAVENAGO DADDA": "Cavenago d'Adda",
+  "CERNUSCO S/NAVIGLIO": "Cernusco sul Naviglio",
+  "CERNUSCO SUL NAVIGLI": "Cernusco sul Naviglio",
+  "CINISELLO BALSARNO": "Cinisello Balsamo",
+  "SAN GIORGIO SU LEGNA": "San Giorgio su Legnano",
+  "SANT'ANGELO LODIGIAN": "Sant'Angelo Lodigiano",
+  "SAN MARTINO IN STRAD": "San Martino in Strada",
+  "SAN COLOMBANO AL LAM": "San Colombano al Lambro",
+  "TREZZANO SN": "Trezzano sul Naviglio",
+  "TREZZANO SUL NAVIGLI": "Trezzano sul Naviglio",
+  "SAN GIULIANO M/SE": "San Giuliano Milanese",
+  "BOFFALORA S.TICINO": "Boffalora sopra Ticino",
+  "BUCINASCO": "Buccinasco"
+};
+function fixCityName(citta) {
+  return CITY_NAME_FIXES[citta.toUpperCase()] || citta;
+}
+
 // Costruisce query e chiave cache per la geocodifica basata sull'indirizzo completo
 function buildGeoQuery(c) {
-  const citta = (c["CITTA'"] || '').trim();
+  const citta = fixCityName((c["CITTA'"] || '').trim());
   if (!citta) return null;
   const indirizzo = (c['INDIRIZZO'] || '').trim();
   const cap = (c['CAP'] || '').toString().trim();
