@@ -1613,6 +1613,20 @@ function formatDateDisplay(d) {
   return `${dd}/${mm}/${d.getFullYear()}`;
 }
 
+// Conversioni per <input type="date"> (richiede formato ISO yyyy-mm-dd,
+// mentre il foglio usa gg/mm/aaaa)
+function toISODate(d) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+function isoToItalianDate(iso) {
+  const m = (iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return iso;
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
 // Considera "recente" un acquisto negli ultimi 12 mesi
 function isRecent(d) {
   const oneYearAgo = new Date();
@@ -1787,6 +1801,7 @@ function showDetail(c) {
   const waLink = waNum ? `https://wa.me/39${waNum}` : null;
 
   const visita26 = c['VISITA 2026'] || '';
+  const visita26ISO = toISODate(parseDateVal(visita26) || new Date());
   const nVisite = c['N. VISITE'] || '';
   const addressDisplay = formatAddressDisplay(c);
   const mapsLink = buildMapsLink(c);
@@ -1858,9 +1873,9 @@ function showDetail(c) {
       </div>
       <div class="field-row">
         <span class="field-label">Data visita 26</span>
-        <input class="field-input" id="input-visita" type="text"
-          value="${visita26}" placeholder="gg/mm/aaaa"
-          onchange="onEdit('VISITA 2026', this.value)">
+        <input class="field-input" id="input-visita" type="date"
+          value="${visita26ISO}"
+          onchange="onEdit('VISITA 2026', isoToItalianDate(this.value))">
       </div>
       <div class="field-row">
         <span class="field-label">Note</span>
