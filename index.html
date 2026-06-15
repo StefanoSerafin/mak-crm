@@ -769,6 +769,124 @@
   }
   .map-popup-btn-visited:hover { background: #2e2e2e; }
 
+  /* AGENDA */
+  #agenda-view {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #agenda-view.visible { display: flex; }
+  #agenda-view .dash-topbar {
+    padding: 16px 20px 0;
+    margin-bottom: 12px;
+  }
+  #agenda-grid {
+    flex: 1;
+    display: flex;
+    gap: 10px;
+    padding: 0 20px 20px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    min-height: 0;
+  }
+  .agenda-day {
+    flex: 1;
+    min-width: 160px;
+    display: flex;
+    flex-direction: column;
+    background: var(--col-surface);
+    border: 1px solid var(--col-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .agenda-day.today {
+    border-color: var(--col-teal);
+    box-shadow: 0 0 0 1px var(--col-teal) inset;
+  }
+  .agenda-day-header {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--col-border);
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .agenda-day-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--col-text);
+    text-transform: capitalize;
+  }
+  .agenda-day-date {
+    font-size: 11px;
+    color: var(--col-text-muted);
+    font-weight: 500;
+  }
+  .agenda-day-count {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--col-teal-dark);
+    flex-shrink: 0;
+  }
+  .agenda-day-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .agenda-entry {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: var(--col-surface2);
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .agenda-entry:hover { background: var(--col-border); }
+  .agenda-entry .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .agenda-entry-info { flex: 1; min-width: 0; }
+  .agenda-entry-name {
+    font-weight: 600;
+    color: var(--col-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .agenda-entry-meta {
+    font-size: 10px;
+    color: var(--col-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .agenda-entry-remove {
+    border: none;
+    background: none;
+    color: var(--col-text-muted);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 2px 4px;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .agenda-entry-remove:hover { color: var(--col-red); }
+  .agenda-empty {
+    font-size: 12px;
+    color: var(--col-text-muted);
+    text-align: center;
+    padding: 16px 8px;
+  }
+
   .dash-topbar {
     display: flex;
     align-items: center;
@@ -999,6 +1117,11 @@
     #map-view .dash-topbar { padding: 12px 12px 0; flex-wrap: wrap; }
     #map-legend, #map-tools-legend { padding: 0 12px 10px; }
     .map-legend-item { font-size: 11px; padding: 4px 8px; }
+
+    /* Agenda */
+    #agenda-view .dash-topbar { padding: 12px 12px 0; flex-wrap: wrap; }
+    #agenda-grid { padding: 0 12px 12px; }
+    .agenda-day { min-width: 140px; }
   }
 
   @media (max-width: 480px) {
@@ -1044,6 +1167,10 @@
     <div class="nav-main-item" data-view="mappe" id="nav-mappe">
       <span class="icon">📍</span>
       Mappe
+    </div>
+    <div class="nav-main-item" data-view="agenda" id="nav-agenda">
+      <span class="icon">📅</span>
+      Agenda
     </div>
   </div>
 
@@ -1228,6 +1355,20 @@
   </div>
 </div>
 
+<div id="agenda-view">
+  <div class="dash-topbar">
+    <button class="hamburger-btn-mobile" aria-label="Menu">☰</button>
+    <div style="flex:1">
+      <div class="dash-title">Agenda visite</div>
+      <div class="dash-subtitle" id="agenda-range">—</div>
+    </div>
+    <button class="btn" id="btn-agenda-prev">←</button>
+    <button class="btn" id="btn-agenda-today">Oggi</button>
+    <button class="btn" id="btn-agenda-next">→</button>
+  </div>
+  <div id="agenda-grid"></div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -1277,6 +1418,115 @@ let currentFilter = 'ALL';
 let selectedIndex = null;
 let selectedRow = null;
 let pendingEdits = {};
+
+// ─── AGENDA VISITE ──────────────────────────────────────────────
+// Registro locale (per dispositivo) delle visite effettuate, indipendente
+// dallo stato dei pin sulla mappa: anche ripristinando i pin ("Mostra tutti")
+// l'agenda resta intatta.
+const AGENDA_KEY = 'mak_agenda_v1';
+const DAY_NAMES_IT = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+const MONTH_NAMES_IT = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
+let agendaWeekOffset = 0;
+
+function loadAgenda() {
+  try { return JSON.parse(localStorage.getItem(AGENDA_KEY) || '{}'); } catch(e) { return {}; }
+}
+function saveAgenda(agenda) {
+  try { localStorage.setItem(AGENDA_KEY, JSON.stringify(agenda)); } catch(e) {}
+}
+function formatDateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+function getMonday(date) {
+  const d = new Date(date);
+  const day = d.getDay(); // 0=Dom .. 6=Sab
+  const diff = (day === 0 ? -6 : 1 - day);
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+// Registra una visita per oggi (chiamato quando si clicca "Visitato" sulla mappa)
+function addAgendaEntry(c) {
+  const agenda = loadAgenda();
+  const key = formatDateKey(new Date());
+  if (!agenda[key]) agenda[key] = [];
+  const cod = String(c['COD.'] || '');
+  if (cod && !agenda[key].some(e => e.cod === cod)) {
+    agenda[key].push({
+      cod,
+      cliente: c['CLIENTE'] || '',
+      citta: c["CITTA'"] || '',
+      network: c['NETWORK'] || '',
+      tipo: c['TIPO'] || '',
+      prog26: (c['PROG26'] || '').trim().toUpperCase()
+    });
+    saveAgenda(agenda);
+  }
+}
+function removeAgendaEntry(dateKey, cod) {
+  const agenda = loadAgenda();
+  if (!agenda[dateKey]) return;
+  agenda[dateKey] = agenda[dateKey].filter(e => e.cod !== cod);
+  if (agenda[dateKey].length === 0) delete agenda[dateKey];
+  saveAgenda(agenda);
+  renderAgenda();
+}
+
+function renderAgenda() {
+  const agenda = loadAgenda();
+  const todayKey = formatDateKey(new Date());
+  const monday = getMonday(new Date());
+  monday.setDate(monday.getDate() + agendaWeekOffset * 7);
+
+  const days = [];
+  for (let i = 0; i < 5; i++) {
+    const d = new Date(monday);
+    d.setDate(d.getDate() + i);
+    days.push(d);
+  }
+
+  // Intestazione: range settimana + totale visite
+  const first = days[0], last = days[4];
+  const sameMonth = first.getMonth() === last.getMonth();
+  const rangeText = sameMonth
+    ? `${first.getDate()} – ${last.getDate()} ${MONTH_NAMES_IT[last.getMonth()]} ${last.getFullYear()}`
+    : `${first.getDate()} ${MONTH_NAMES_IT[first.getMonth()]} – ${last.getDate()} ${MONTH_NAMES_IT[last.getMonth()]} ${last.getFullYear()}`;
+  const totalWeek = days.reduce((sum, d) => sum + (agenda[formatDateKey(d)] || []).length, 0);
+  document.getElementById('agenda-range').textContent =
+    `${rangeText}${agendaWeekOffset === 0 ? ' (settimana corrente)' : ''} · ${totalWeek} visite`;
+
+  document.getElementById('agenda-grid').innerHTML = days.map(d => {
+    const key = formatDateKey(d);
+    const entries = agenda[key] || [];
+    const isToday = key === todayKey;
+    return `
+      <div class="agenda-day ${isToday ? 'today' : ''}">
+        <div class="agenda-day-header">
+          <div class="agenda-day-name">${DAY_NAMES_IT[d.getDay()]}<br><span class="agenda-day-date">${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}</span></div>
+          <div class="agenda-day-count">${entries.length}</div>
+        </div>
+        <div class="agenda-day-list">
+          ${entries.length === 0 ? '<div class="agenda-empty">Nessuna visita</div>' : entries.map(e => {
+            const pc = PROG26_CONFIG[e.prog26] || PROG26_CONFIG[''];
+            return `
+              <div class="agenda-entry" onclick="goToClient('${escJs(e.cod)}')">
+                <span class="dot" style="background:${pc.color}"></span>
+                <div class="agenda-entry-info">
+                  <div class="agenda-entry-name">${e.cliente}</div>
+                  <div class="agenda-entry-meta">${e.citta || ''}</div>
+                </div>
+                <button class="agenda-entry-remove" title="Rimuovi dall'agenda" onclick="event.stopPropagation(); removeAgendaEntry('${key}','${escJs(e.cod)}')">✕</button>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
 
 // Mappa - configurazione condivisa
 const GEOCODE_CACHE_KEY = 'mak_geocache_v2';
@@ -2150,7 +2400,7 @@ class MapModule {
         });
         marker.bindPopup(this.buildPopup(c, pc));
         marker.addTo(this.mapLayers[key]);
-        if (cod) this.clientMarkers[cod] = { marker, layerKey: key };
+        if (cod) this.clientMarkers[cod] = { marker, layerKey: key, client: c };
       } catch(e) {
         console.error('Errore plotting cliente', c['COD.'], e);
       }
@@ -2166,10 +2416,13 @@ class MapModule {
     if (entry && this.mapLayers[entry.layerKey]) {
       this.mapLayers[entry.layerKey].removeLayer(entry.marker);
     }
+    if (this.cfg.recordAgenda && entry && entry.client) {
+      addAgendaEntry(entry.client);
+    }
     delete this.clientMarkers[cod];
     this.renderLegend();
     this.updateStatus(0, 0);
-    showToast('Cliente segnato come visitato e rimosso dalla mappa.');
+    showToast('Cliente segnato come visitato e aggiunto all\'agenda di oggi.');
   }
 
   resetHidden() {
@@ -2323,6 +2576,7 @@ const visitMap = new MapModule({
   geocodeCacheKey: GEOCODE_CACHE_KEY,
   hiddenStorageKey: 'mak_map_hidden_v1',
   supportHide: true,
+  recordAgenda: true,
   categories: PROG26_CONFIG,
   categoryOrder: MAP_PROG26_KEYS,
   getCategoryKey: c => (c['PROG26'] || '').trim().toUpperCase(),
@@ -2370,6 +2624,7 @@ function goToClient(codice) {
   document.getElementById('content').style.display = 'flex';
   document.getElementById('dashboard-view').classList.remove('visible');
   document.getElementById('map-view').classList.remove('visible');
+  document.getElementById('agenda-view').classList.remove('visible');
 
   // Reset filtri e cerca per codice
   currentFilter = 'ALL';
@@ -2409,7 +2664,7 @@ document.querySelectorAll('.sidebar-item').forEach(el => {
   });
 });
 
-// ─── NAV VIEW SWITCH (Clienti / Dashboard / Mappe) ─────────────────
+// ─── NAV VIEW SWITCH (Clienti / Dashboard / Mappe / Agenda) ────────
 document.querySelectorAll('.nav-main-item').forEach(el => {
   el.addEventListener('click', () => {
     document.querySelectorAll('.nav-main-item').forEach(e => e.classList.remove('active'));
@@ -2420,14 +2675,29 @@ document.querySelectorAll('.nav-main-item').forEach(el => {
     document.getElementById('content').style.display = (view === 'clienti') ? 'flex' : 'none';
     document.getElementById('dashboard-view').classList.toggle('visible', view === 'dashboard');
     document.getElementById('map-view').classList.toggle('visible', view === 'mappe');
+    document.getElementById('agenda-view').classList.toggle('visible', view === 'agenda');
 
     if (view === 'dashboard') renderDashboard();
     if (view === 'mappe') {
       const activeTab = document.querySelector('.map-tab.active')?.dataset.tab || 'visite';
       switchMapTab(activeTab);
     }
+    if (view === 'agenda') renderAgenda();
     closeSidebar();
   });
+});
+
+document.getElementById('btn-agenda-prev').addEventListener('click', () => {
+  agendaWeekOffset--;
+  renderAgenda();
+});
+document.getElementById('btn-agenda-next').addEventListener('click', () => {
+  agendaWeekOffset++;
+  renderAgenda();
+});
+document.getElementById('btn-agenda-today').addEventListener('click', () => {
+  agendaWeekOffset = 0;
+  renderAgenda();
 });
 
 document.getElementById('btn-dash-refresh').addEventListener('click', () => {
