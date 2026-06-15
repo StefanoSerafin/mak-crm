@@ -1858,8 +1858,18 @@ function showDetail(c) {
 
     <div class="detail-section">
       <div class="detail-section-title">Strumenti</div>
-      ${fieldRow('Tool', c['TOOL'] || '—', false)}
-      ${fieldRow('Diagnosi', c['DIAGNOSI'] || '—', false)}
+      <div class="field-row">
+        <span class="field-label">Tool</span>
+        <input class="field-input" id="input-tool" type="text"
+          value="${c['TOOL'] || ''}" placeholder="—"
+          onchange="onEdit('TOOL', this.value)">
+      </div>
+      <div class="field-row">
+        <span class="field-label">Diagnosi</span>
+        <input class="field-input" id="input-diagnosi" type="text"
+          value="${c['DIAGNOSI'] || ''}" placeholder="—"
+          onchange="onEdit('DIAGNOSI', this.value)">
+      </div>
     </div>
 
     <div class="detail-section">
@@ -1902,7 +1912,6 @@ function showDetail(c) {
 
     <div class="detail-actions">
       ${waLink ? `<a class="action-btn green" href="${waLink}" target="_blank">💬 WhatsApp</a>` : ''}
-      <button class="action-btn" onclick="callClient('${c['TELEFONO'] || c['CELL'] || ''}')">📞 Chiama</button>
       <button class="action-btn green" id="btn-save" onclick="saveEdits('${escJs(c['CLIENTE'])}', '${c['COD.'] || ''}')">💾 Salva</button>
     </div>
   `;
@@ -2770,10 +2779,6 @@ function getInitials(name) {
 
 function escJs(s) {
   return (s||'').replace(/'/g, "\\'").replace(/"/g, '\\"');
-}
-
-function callClient(tel) {
-  if (tel) window.location.href = 'tel:' + tel;
 }
 
 function showToast(msg, duration=3000) {
