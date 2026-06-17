@@ -1128,6 +1128,41 @@
     .kpi-cards { grid-template-columns: 1fr 1fr; }
     .kpi-card .kpi-value { font-size: 20px; }
     .dash-topbar { flex-wrap: wrap; gap: 8px; }
+
+    /* Agenda su iPhone: scroll orizzontale colonne */
+    #agenda-grid {
+      flex-direction: row;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 0 8px 16px;
+      gap: 8px;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+    .agenda-day {
+      min-width: 78vw;
+      max-width: 85vw;
+      flex-shrink: 0;
+      scroll-snap-align: start;
+    }
+    .agenda-day.today { border-width: 2px; }
+    #agenda-view .dash-topbar { gap: 6px; }
+    #agenda-view .dash-topbar .btn { padding: 6px 10px; font-size: 12px; }
+  }
+
+  /* iPad: 3 colonne visibili + scroll */
+  @media (min-width: 481px) and (max-width: 900px) {
+    #agenda-grid {
+      flex-direction: row;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scroll-snap-type: x mandatory;
+    }
+    .agenda-day {
+      min-width: 44vw;
+      flex-shrink: 0;
+      scroll-snap-align: start;
+    }
   }
 </style>
 </head>
@@ -1364,6 +1399,7 @@
       <button class="btn" id="btn-agenda-prev">←</button>
       <button class="btn" id="btn-agenda-today">Oggi</button>
       <button class="btn" id="btn-agenda-next">→</button>
+      <button class="btn" id="btn-agenda-refresh">⟳</button>
     </div>
     <div id="agenda-grid"></div>
   </div>
@@ -1420,20 +1456,59 @@ let selectedRow = null;
 let pendingEdits = {};
 
 // ─── AGENDA VISITE ──────────────────────────────────────────────
-// Registro locale (per dispositivo) delle visite effettuate, indipendente
-// dallo stato dei pin sulla mappa: anche ripristinando i pin ("Mostra tutti")
-// l'agenda resta intatta.
+// Registro visite sincronizzato su Google Sheet (foglio AgendaVisite).
+// localStorage usato solo come cache per rendering immediato — la fonte
+// di verità è sempre lo sheet, leggibile da qualsiasi dispositivo.
 const AGENDA_KEY = 'mak_agenda_v1';
 const DAY_NAMES_IT = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
 const MONTH_NAMES_IT = ['gennaio','febbraio','marzo','aprile','maggio','giugno','luglio','agosto','settembre','ottobre','novembre','dicembre'];
 let agendaWeekOffset = 0;
+let agendaData = {}; // {dateKey: [{cod, cliente, citta, network, tipo, prog26}]}
+let agendaLoaded = false;
 
-function loadAgenda() {
-  try { return JSON.parse(localStorage.getItem(AGENDA_KEY) || '{}'); } catch(e) { return {}; }
+// Legge l'agenda dallo sheet e aggiorna la cache locale
+async function loadAgendaFromSheet() {
+  try {
+    const url = `${APPS_SCRIPT_URL}?action=readAgenda&callback=agendaCb`;
+    const data = await new Promise((resolve, reject) => {
+      const cbName = 'agendaCb_' + Date.now();
+      const script = document.createElement('script');
+      window[cbName] = (d) => { delete window[cbName]; document.head.removeChild(script); resolve(d); };
+      script.onerror = reject;
+      script.src = `${APPS_SCRIPT_URL}?action=readAgenda&callback=${cbName}`;
+      document.head.appendChild(script);
+      setTimeout(() => { delete window[cbName]; reject(new Error('timeout')); }, 15000);
+    });
+
+    if (data && data.rows) {
+      // Ricostruisce la struttura {dateKey: [...entries]}
+      const agenda = {};
+      data.rows.forEach(r => {
+        const key = (r.DATA || '').trim();
+        if (!key) return;
+        if (!agenda[key]) agenda[key] = [];
+        agenda[key].push({
+          cod: String(r.COD || ''),
+          cliente: r.CLIENTE || '',
+          citta: r.CITTA || '',
+          network: r.NETWORK || '',
+          tipo: r.TIPO || '',
+          prog26: (r.PROG26 || '').trim().toUpperCase()
+        });
+      });
+      agendaData = agenda;
+      // Salva cache locale
+      try { localStorage.setItem(AGENDA_KEY, JSON.stringify(agenda)); } catch(e) {}
+      return true;
+    }
+  } catch(e) {
+    console.warn('loadAgendaFromSheet fallita, uso cache locale:', e);
+  }
+  // Fallback: cache locale
+  try { agendaData = JSON.parse(localStorage.getItem(AGENDA_KEY) || '{}'); } catch(e) { agendaData = {}; }
+  return false;
 }
-function saveAgenda(agenda) {
-  try { localStorage.setItem(AGENDA_KEY, JSON.stringify(agenda)); } catch(e) {}
-}
+
 function formatDateKey(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -1442,20 +1517,23 @@ function formatDateKey(date) {
 }
 function getMonday(date) {
   const d = new Date(date);
-  const day = d.getDay(); // 0=Dom .. 6=Sab
+  const day = d.getDay();
   const diff = (day === 0 ? -6 : 1 - day);
   d.setDate(d.getDate() + diff);
   d.setHours(0, 0, 0, 0);
   return d;
 }
-// Registra una visita per oggi (chiamato quando si clicca "Visitato" sulla mappa)
-function addAgendaEntry(c) {
-  const agenda = loadAgenda();
+
+// Registra una visita (chiamato da MapModule.hideClient quando recordAgenda:true)
+async function addAgendaEntry(c) {
   const key = formatDateKey(new Date());
-  if (!agenda[key]) agenda[key] = [];
   const cod = String(c['COD.'] || '');
-  if (cod && !agenda[key].some(e => e.cod === cod)) {
-    agenda[key].push({
+  if (!cod) return;
+
+  // Aggiorna struttura locale immediata
+  if (!agendaData[key]) agendaData[key] = [];
+  if (!agendaData[key].some(e => e.cod === cod)) {
+    agendaData[key].push({
       cod,
       cliente: c['CLIENTE'] || '',
       citta: c["CITTA'"] || '',
@@ -1463,20 +1541,63 @@ function addAgendaEntry(c) {
       tipo: c['TIPO'] || '',
       prog26: (c['PROG26'] || '').trim().toUpperCase()
     });
-    saveAgenda(agenda);
+    try { localStorage.setItem(AGENDA_KEY, JSON.stringify(agendaData)); } catch(e) {}
+  }
+
+  // Scrivi su sheet in background
+  try {
+    await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'addAgenda',
+        entry: {
+          DATA: key,
+          COD: cod,
+          CLIENTE: c['CLIENTE'] || '',
+          CITTA: c["CITTA'"] || '',
+          NETWORK: c['NETWORK'] || '',
+          TIPO: c['TIPO'] || '',
+          PROG26: (c['PROG26'] || '').trim().toUpperCase()
+        }
+      })
+    });
+  } catch(e) {
+    console.warn('addAgendaEntry: errore scrittura sheet', e);
   }
 }
-function removeAgendaEntry(dateKey, cod) {
-  const agenda = loadAgenda();
-  if (!agenda[dateKey]) return;
-  agenda[dateKey] = agenda[dateKey].filter(e => e.cod !== cod);
-  if (agenda[dateKey].length === 0) delete agenda[dateKey];
-  saveAgenda(agenda);
+
+async function removeAgendaEntry(dateKey, cod) {
+  // Rimuovi localmente
+  if (agendaData[dateKey]) {
+    agendaData[dateKey] = agendaData[dateKey].filter(e => e.cod !== cod);
+    if (agendaData[dateKey].length === 0) delete agendaData[dateKey];
+    try { localStorage.setItem(AGENDA_KEY, JSON.stringify(agendaData)); } catch(e) {}
+  }
+
+  // Aggiorna UI subito
+  renderAgenda();
+
+  // Rimuovi da sheet in background
+  try {
+    await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'removeAgenda', data: dateKey, cod })
+    });
+  } catch(e) {
+    console.warn('removeAgendaEntry: errore scrittura sheet', e);
+  }
+}
+
+async function initAgendaView() {
+  if (!agendaLoaded) {
+    document.getElementById('agenda-range').textContent = 'Caricamento…';
+    await loadAgendaFromSheet();
+    agendaLoaded = true;
+  }
   renderAgenda();
 }
 
 function renderAgenda() {
-  const agenda = loadAgenda();
   const todayKey = formatDateKey(new Date());
   const monday = getMonday(new Date());
   monday.setDate(monday.getDate() + agendaWeekOffset * 7);
@@ -1488,19 +1609,19 @@ function renderAgenda() {
     days.push(d);
   }
 
-  // Intestazione: range settimana + totale visite
+  // Header range
   const first = days[0], last = days[4];
   const sameMonth = first.getMonth() === last.getMonth();
   const rangeText = sameMonth
     ? `${first.getDate()} – ${last.getDate()} ${MONTH_NAMES_IT[last.getMonth()]} ${last.getFullYear()}`
     : `${first.getDate()} ${MONTH_NAMES_IT[first.getMonth()]} – ${last.getDate()} ${MONTH_NAMES_IT[last.getMonth()]} ${last.getFullYear()}`;
-  const totalWeek = days.reduce((sum, d) => sum + (agenda[formatDateKey(d)] || []).length, 0);
+  const totalWeek = days.reduce((sum, d) => sum + (agendaData[formatDateKey(d)] || []).length, 0);
   document.getElementById('agenda-range').textContent =
     `${rangeText}${agendaWeekOffset === 0 ? ' (settimana corrente)' : ''} · ${totalWeek} visite`;
 
   document.getElementById('agenda-grid').innerHTML = days.map(d => {
     const key = formatDateKey(d);
-    const entries = agenda[key] || [];
+    const entries = agendaData[key] || [];
     const isToday = key === todayKey;
     return `
       <div class="agenda-day ${isToday ? 'today' : ''}">
@@ -1513,7 +1634,7 @@ function renderAgenda() {
             const pc = PROG26_CONFIG[e.prog26] || PROG26_CONFIG[''];
             return `
               <div class="agenda-entry" onclick="goToClient('${escJs(e.cod)}')">
-                <span class="dot" style="background:${pc.color}"></span>
+                <span class="dot" style="background:${pc ? pc.color : '#999'}"></span>
                 <div class="agenda-entry-info">
                   <div class="agenda-entry-name">${e.cliente}</div>
                   <div class="agenda-entry-meta">${e.citta || ''}</div>
@@ -2706,9 +2827,15 @@ document.querySelectorAll('.nav-main-item').forEach(el => {
       const activeTab = document.querySelector('.map-tab.active')?.dataset.tab || 'visite';
       switchMapTab(activeTab);
     }
-    if (view === 'agenda') renderAgenda();
+    if (view === 'agenda') initAgendaView();
     closeSidebar();
   });
+});
+
+document.getElementById('btn-agenda-refresh').addEventListener('click', async () => {
+  agendaLoaded = false;
+  await initAgendaView();
+  showToast('Agenda aggiornata dal server.');
 });
 
 document.getElementById('btn-agenda-prev').addEventListener('click', () => {
