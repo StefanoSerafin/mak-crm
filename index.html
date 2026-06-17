@@ -1469,43 +1469,36 @@ let agendaLoaded = false;
 // Legge l'agenda dallo sheet e aggiorna la cache locale
 async function loadAgendaFromSheet() {
   try {
-    const url = `${APPS_SCRIPT_URL}?action=readAgenda&callback=agendaCb`;
-    const data = await new Promise((resolve, reject) => {
-      const cbName = 'agendaCb_' + Date.now();
-      const script = document.createElement('script');
-      window[cbName] = (d) => { delete window[cbName]; document.head.removeChild(script); resolve(d); };
-      script.onerror = reject;
-      script.src = `${APPS_SCRIPT_URL}?action=readAgenda&callback=${cbName}`;
-      document.head.appendChild(script);
-      setTimeout(() => { delete window[cbName]; reject(new Error('timeout')); }, 15000);
-    });
+    console.log('[Agenda] Lettura da sheet…');
+    const data = await jsonpCall({ action: 'readAgenda' });
+    console.log('[Agenda] Risposta:', JSON.stringify(data).substring(0, 200));
 
-    if (data && data.rows) {
-      // Ricostruisce la struttura {dateKey: [...entries]}
+    if (data && Array.isArray(data.rows)) {
       const agenda = {};
       data.rows.forEach(r => {
         const key = (r.DATA || '').trim();
         if (!key) return;
         if (!agenda[key]) agenda[key] = [];
         agenda[key].push({
-          cod: String(r.COD || ''),
+          cod:     String(r.COD     || ''),
           cliente: r.CLIENTE || '',
-          citta: r.CITTA || '',
+          citta:   r.CITTA   || '',
           network: r.NETWORK || '',
-          tipo: r.TIPO || '',
-          prog26: (r.PROG26 || '').trim().toUpperCase()
+          tipo:    r.TIPO    || '',
+          prog26:  (r.PROG26 || '').trim().toUpperCase()
         });
       });
       agendaData = agenda;
-      // Salva cache locale
       try { localStorage.setItem(AGENDA_KEY, JSON.stringify(agenda)); } catch(e) {}
+      console.log('[Agenda] Caricati', data.rows.length, 'record,', Object.keys(agenda).length, 'giorni');
       return true;
     }
+    console.warn('[Agenda] Risposta senza rows:', data);
   } catch(e) {
-    console.warn('loadAgendaFromSheet fallita, uso cache locale:', e);
+    console.error('[Agenda] Errore loadAgendaFromSheet:', e.message);
   }
-  // Fallback: cache locale
   try { agendaData = JSON.parse(localStorage.getItem(AGENDA_KEY) || '{}'); } catch(e) { agendaData = {}; }
+  console.log('[Agenda] Uso cache locale:', Object.keys(agendaData).length, 'giorni');
   return false;
 }
 
@@ -1529,20 +1522,30 @@ function jsonpCall(params) {
   return new Promise((resolve, reject) => {
     const cbName = 'cb_' + Date.now() + '_' + Math.floor(Math.random() * 9999);
     const script = document.createElement('script');
+    let done = false;
     window[cbName] = (d) => {
+      if (done) return; done = true;
       delete window[cbName];
       if (script.parentNode) script.parentNode.removeChild(script);
       resolve(d);
     };
-    script.onerror = () => { delete window[cbName]; reject(new Error('JSONP error')); };
-    const qs = Object.entries({ ...params, callback: cbName })
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
-    script.src = `${APPS_SCRIPT_URL}?${qs}`;
-    document.head.appendChild(script);
-    setTimeout(() => {
+    script.onerror = (e) => {
+      if (done) return; done = true;
       delete window[cbName];
       if (script.parentNode) script.parentNode.removeChild(script);
-      reject(new Error('JSONP timeout'));
+      reject(new Error('JSONP script error: ' + JSON.stringify(params)));
+    };
+    const qs = Object.entries({ ...params, callback: cbName })
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+    const src = `${APPS_SCRIPT_URL}?${qs}`;
+    console.log('[JSONP] →', params.action, src.substring(0, 100) + '…');
+    script.src = src;
+    document.head.appendChild(script);
+    setTimeout(() => {
+      if (done) return; done = true;
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      reject(new Error('JSONP timeout: ' + params.action));
     }, 15000);
   });
 }
@@ -1605,9 +1608,10 @@ async function removeAgendaEntry(dateKey, cod) {
 
 async function initAgendaView() {
   if (!agendaLoaded) {
-    document.getElementById('agenda-range').textContent = 'Caricamento…';
-    await loadAgendaFromSheet();
+    document.getElementById('agenda-range').textContent = 'Caricamento dal server…';
+    const ok = await loadAgendaFromSheet();
     agendaLoaded = true;
+    if (!ok) showToast('⚠ Agenda caricata da cache locale (server non raggiunto)');
   }
   renderAgenda();
 }
@@ -2920,7 +2924,7 @@ function getInitials(name) {
 }
 
 function escJs(s) {
-  return (s||'').replace(/'/g, "\\'").replace(/"/g, '\\"');
+  return (s == null ? '' : String(s)).replace(/'/g, "\\'").replace(/"/g, '\\"');
 }
 
 function showToast(msg, duration=3000) {
