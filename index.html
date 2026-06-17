@@ -366,8 +366,11 @@
     border-left: 1px solid var(--col-border);
     background: var(--col-surface);
     overflow-y: auto;
-    display: flex;
+    display: none;
     flex-direction: column;
+  }
+  #detail-panel.open {
+    display: flex;
   }
 
   #detail-close {
@@ -1008,7 +1011,13 @@
     text-transform: uppercase;
     color: var(--col-text-faint);
     border-bottom: 1px solid var(--col-border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
   }
+  .dash-table th:hover { color: var(--col-text); }
+  .dash-table th.sort-asc::after { content: ' ↑'; color: var(--col-teal); }
+  .dash-table th.sort-desc::after { content: ' ↓'; color: var(--col-teal); }
   .dash-table td {
     padding: 7px 8px;
     border-bottom: 1px solid var(--col-border);
@@ -1272,15 +1281,15 @@
       <table id="client-table">
         <thead>
           <tr>
-            <th>Cliente</th>
-            <th>Città</th>
-            <th>Tipo</th>
-            <th>Network</th>
-            <th>Prog26</th>
-            <th style="text-align:right">2024</th>
-            <th style="text-align:right">2025</th>
-            <th style="text-align:right">2026</th>
-            <th style="text-align:center">Vis26</th>
+            <th data-col="CLIENTE" onclick="sortTable('CLIENTE')">Cliente</th>
+            <th data-col="CITTA'" onclick="sortTable('CITTA\'')">Città</th>
+            <th data-col="TIPO" onclick="sortTable('TIPO')">Tipo</th>
+            <th data-col="NETWORK" onclick="sortTable('NETWORK')">Network</th>
+            <th data-col="PROG26" onclick="sortTable('PROG26')">Prog26</th>
+            <th data-col="2024" style="text-align:right" onclick="sortTable('2024')">2024</th>
+            <th data-col="2025" style="text-align:right" onclick="sortTable('2025')">2025</th>
+            <th data-col="2026" style="text-align:right" onclick="sortTable('2026')">2026</th>
+            <th data-col="VISITA 2026" style="text-align:center" onclick="sortTable('VISITA 2026')">Vis26</th>
           </tr>
         </thead>
         <tbody id="client-tbody"></tbody>
@@ -1454,6 +1463,42 @@ let currentFilter = 'ALL';
 let selectedIndex = null;
 let selectedRow = null;
 let pendingEdits = {};
+let sortCol = 'CLIENTE';   // ordinamento default: alfabetico per nome
+let sortDir = 'asc';
+
+function sortTable(col) {
+  if (sortCol === col) {
+    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortCol = col;
+    sortDir = 'asc';
+  }
+  // Aggiorna indicatori visivi
+  document.querySelectorAll('.dash-table th[data-col]').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.col === sortCol) th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+  });
+  applySort();
+  renderTable();
+}
+
+function applySort() {
+  const numCols = ['2024', '2025', '2026'];
+  filteredClients.sort((a, b) => {
+    let va = a[sortCol] == null ? '' : a[sortCol];
+    let vb = b[sortCol] == null ? '' : b[sortCol];
+    if (numCols.includes(sortCol)) {
+      va = parseFloat(String(va).replace(/[^0-9.-]/g, '')) || 0;
+      vb = parseFloat(String(vb).replace(/[^0-9.-]/g, '')) || 0;
+      return sortDir === 'asc' ? va - vb : vb - va;
+    }
+    va = String(va).toLowerCase();
+    vb = String(vb).toLowerCase();
+    if (va < vb) return sortDir === 'asc' ? -1 : 1;
+    if (va > vb) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+}
 
 // ─── AGENDA VISITE ──────────────────────────────────────────────
 // Registro visite sincronizzato su Google Sheet (foglio AgendaVisite).
@@ -1844,6 +1889,12 @@ function applyFilter() {
   const network = document.getElementById('filter-network').value;
   const prov = document.getElementById('filter-prov').value;
 
+  // Aggiorna indicatore visivo colonna attiva
+  document.querySelectorAll('.dash-table th[data-col]').forEach(th => {
+    th.classList.remove('sort-asc', 'sort-desc');
+    if (th.dataset.col === sortCol) th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+  });
+
   filteredClients = allClients.filter(c => {
     // PROG26 filter
     if (currentFilter === 'ACTIVE') {
@@ -1869,6 +1920,7 @@ function applyFilter() {
     return true;
   });
 
+  applySort();
   renderTable();
   document.getElementById('result-count').textContent = `${filteredClients.length} clienti`;
 }
