@@ -1030,8 +1030,8 @@
     white-space: nowrap;
   }
   .dash-table th:hover { color: var(--col-text); }
-  .dash-table th.sort-asc::after { content: ' ↑'; color: var(--col-teal); }
-  .dash-table th.sort-desc::after { content: ' ↓'; color: var(--col-teal); }
+  .dash-table th.sort-asc  { color: var(--col-teal-dark); }
+  .dash-table th.sort-desc { color: var(--col-teal-dark); }
   .dash-table td {
     padding: 7px 8px;
     border-bottom: 1px solid var(--col-border);
@@ -1295,15 +1295,15 @@
       <table id="client-table">
         <thead>
           <tr>
-            <th data-col="CLIENTE" onclick="sortTable('CLIENTE')">Cliente</th>
-            <th data-col="CITTA'" onclick="sortTable('CITTA\'')">Città</th>
-            <th data-col="TIPO" onclick="sortTable('TIPO')">Tipo</th>
-            <th data-col="NETWORK" onclick="sortTable('NETWORK')">Network</th>
-            <th data-col="PROG26" onclick="sortTable('PROG26')">Prog26</th>
-            <th data-col="2024" style="text-align:right" onclick="sortTable('2024')">2024</th>
-            <th data-col="2025" style="text-align:right" onclick="sortTable('2025')">2025</th>
-            <th data-col="2026" style="text-align:right" onclick="sortTable('2026')">2026</th>
-            <th data-col="VISITA 2026" style="text-align:center" onclick="sortTable('VISITA 2026')">Vis26</th>
+            <th data-col="CLIENTE" data-label="Cliente" onclick="sortTable('CLIENTE')">Cliente</th>
+            <th data-col="CITTA'" data-label="Città" onclick="sortTable('CITTA\'')">Città</th>
+            <th data-col="TIPO" data-label="Tipo" onclick="sortTable('TIPO')">Tipo</th>
+            <th data-col="NETWORK" data-label="Network" onclick="sortTable('NETWORK')">Network</th>
+            <th data-col="PROG26" data-label="Prog26" onclick="sortTable('PROG26')">Prog26</th>
+            <th data-col="2024" data-label="2024" style="text-align:right" onclick="sortTable('2024')">2024</th>
+            <th data-col="2025" data-label="2025" style="text-align:right" onclick="sortTable('2025')">2025</th>
+            <th data-col="2026" data-label="2026" style="text-align:right" onclick="sortTable('2026')">2026</th>
+            <th data-col="VISITA 2026" data-label="Vis26" style="text-align:center" onclick="sortTable('VISITA 2026')">Vis26</th>
           </tr>
         </thead>
         <tbody id="client-tbody"></tbody>
@@ -1483,8 +1483,12 @@ let sortDir = 'asc';
 function updateSortIndicators() {
   document.querySelectorAll('.dash-table th[data-col]').forEach(th => {
     th.classList.remove('sort-asc', 'sort-desc');
+    const label = th.dataset.label || th.textContent.replace(/[↑↓\s]+$/, '').trim();
     if (th.dataset.col === sortCol) {
       th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+      th.textContent = label + (sortDir === 'asc' ? ' ↑' : ' ↓');
+    } else {
+      th.textContent = label;
     }
   });
 }
