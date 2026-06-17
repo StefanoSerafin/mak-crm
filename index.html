@@ -1476,8 +1476,10 @@ async function loadAgendaFromSheet() {
     if (data && Array.isArray(data.rows)) {
       const agenda = {};
       data.rows.forEach(r => {
-        const key = (r.DATA || '').trim();
-        if (!key) return;
+        // La DATA può arrivare come "2026-06-17T07:00:00.000Z" se Google Sheets
+        // ha salvato il valore come datetime — tronchiamo alla sola data
+        const key = (r.DATA || '').toString().trim().substring(0, 10);
+        if (!key || key.length < 10) return;
         if (!agenda[key]) agenda[key] = [];
         agenda[key].push({
           cod:     String(r.COD     || ''),
