@@ -1524,6 +1524,29 @@ function getMonday(date) {
   return d;
 }
 
+// Chiamata JSONP generica (compatibile iOS Safari — niente fetch/CORS)
+function jsonpCall(params) {
+  return new Promise((resolve, reject) => {
+    const cbName = 'cb_' + Date.now() + '_' + Math.floor(Math.random() * 9999);
+    const script = document.createElement('script');
+    window[cbName] = (d) => {
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      resolve(d);
+    };
+    script.onerror = () => { delete window[cbName]; reject(new Error('JSONP error')); };
+    const qs = Object.entries({ ...params, callback: cbName })
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+    script.src = `${APPS_SCRIPT_URL}?${qs}`;
+    document.head.appendChild(script);
+    setTimeout(() => {
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      reject(new Error('JSONP timeout'));
+    }, 15000);
+  });
+}
+
 // Registra una visita (chiamato da MapModule.hideClient quando recordAgenda:true)
 async function addAgendaEntry(c) {
   const key = formatDateKey(new Date());
@@ -1544,22 +1567,17 @@ async function addAgendaEntry(c) {
     try { localStorage.setItem(AGENDA_KEY, JSON.stringify(agendaData)); } catch(e) {}
   }
 
-  // Scrivi su sheet in background
+  // Scrivi su sheet via JSONP GET (compatibile iOS)
   try {
-    await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify({
-        action: 'addAgenda',
-        entry: {
-          DATA: key,
-          COD: cod,
-          CLIENTE: c['CLIENTE'] || '',
-          CITTA: c["CITTA'"] || '',
-          NETWORK: c['NETWORK'] || '',
-          TIPO: c['TIPO'] || '',
-          PROG26: (c['PROG26'] || '').trim().toUpperCase()
-        }
-      })
+    await jsonpCall({
+      action: 'addAgenda',
+      data: key,
+      cod: cod,
+      cliente: c['CLIENTE'] || '',
+      citta: c["CITTA'"] || '',
+      network: c['NETWORK'] || '',
+      tipo: c['TIPO'] || '',
+      prog26: (c['PROG26'] || '').trim().toUpperCase()
     });
   } catch(e) {
     console.warn('addAgendaEntry: errore scrittura sheet', e);
@@ -1577,12 +1595,9 @@ async function removeAgendaEntry(dateKey, cod) {
   // Aggiorna UI subito
   renderAgenda();
 
-  // Rimuovi da sheet in background
+  // Rimuovi da sheet via JSONP GET (compatibile iOS)
   try {
-    await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'removeAgenda', data: dateKey, cod })
-    });
+    await jsonpCall({ action: 'removeAgenda', data: dateKey, cod });
   } catch(e) {
     console.warn('removeAgendaEntry: errore scrittura sheet', e);
   }
