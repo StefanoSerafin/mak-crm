@@ -2221,16 +2221,17 @@ async function writeToSheet(clienteName, codice, edits) {
     const rowIndex = allClients.findIndex(c => c['CLIENTE'] === clienteName && c['COD.'] === codice);
     if (rowIndex < 0) { showToast('⚠ Cliente non trovato nel dataset.'); return false; }
 
-    // Converte edits in stringa JSON compatta da passare come parametro GET
     const updates = JSON.stringify(Object.entries(edits).map(([col, value]) => ({ col, value })));
+    console.log('[writeToSheet] rowIndex:', rowIndex, 'updates:', updates);
     const result = await jsonpCall({
       action: 'updateCliente',
       rowIndex: rowIndex,
       updates: updates
     });
+    console.log('[writeToSheet] risposta:', JSON.stringify(result));
     return result && result.ok === true;
   } catch(e) {
-    console.error('writeToSheet error:', e);
+    console.error('[writeToSheet] error:', e.message);
     return false;
   }
 }
