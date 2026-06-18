@@ -2221,14 +2221,14 @@ async function writeToSheet(clienteName, codice, edits) {
     const rowIndex = allClients.findIndex(c => c['CLIENTE'] === clienteName && c['COD.'] === codice);
     if (rowIndex < 0) { showToast('⚠ Cliente non trovato nel dataset.'); return false; }
 
-    const updates = Object.entries(edits).map(([col, value]) => ({ col, value }));
-
-    const res = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify({ sheetName: SHEET_NAME, rowIndex, updates })
+    // Converte edits in stringa JSON compatta da passare come parametro GET
+    const updates = JSON.stringify(Object.entries(edits).map(([col, value]) => ({ col, value })));
+    const result = await jsonpCall({
+      action: 'updateCliente',
+      rowIndex: rowIndex,
+      updates: updates
     });
-    const json = await res.json();
-    return json.ok === true;
+    return result && result.ok === true;
   } catch(e) {
     console.error('writeToSheet error:', e);
     return false;
