@@ -2221,15 +2221,24 @@ async function writeToSheet(clienteName, codice, edits) {
     const rowIndex = allClients.findIndex(c => c['CLIENTE'] === clienteName && c['COD.'] === codice);
     if (rowIndex < 0) { showToast('⚠ Cliente non trovato nel dataset.'); return false; }
 
-    const updates = JSON.stringify(Object.entries(edits).map(([col, value]) => ({ col, value })));
-    console.log('[writeToSheet] rowIndex:', rowIndex, 'updates:', updates);
-    const result = await jsonpCall({
-      action: 'updateCliente',
-      rowIndex: rowIndex,
-      updates: updates
-    });
-    console.log('[writeToSheet] risposta:', JSON.stringify(result));
-    return result && result.ok === true;
+    const entries = Object.entries(edits);
+    console.log('[writeToSheet] rowIndex:', rowIndex, 'campi:', entries.map(([k]) => k).join(', '));
+
+    // Invia una chiamata per ogni campo modificato (evita JSON annidato nell'URL)
+    for (const [col, value] of entries) {
+      const result = await jsonpCall({
+        action: 'updateCliente',
+        rowIndex: rowIndex,
+        col: col,
+        value: value
+      });
+      console.log('[writeToSheet]', col, '→', JSON.stringify(result));
+      if (!result || result.ok !== true) {
+        console.error('[writeToSheet] fallito su colonna:', col, result);
+        return false;
+      }
+    }
+    return true;
   } catch(e) {
     console.error('[writeToSheet] error:', e.message);
     return false;
