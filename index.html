@@ -2148,6 +2148,13 @@ function onEdit(key, value) {
 
 // ─── SAVE (Google Sheets API) ──────────────────────────────────────
 async function saveEdits(clienteName, codice) {
+  // Se il campo data visita è compilato ma non è stato toccato (onchange non scattato),
+  // lo aggiungiamo manualmente ai pendingEdits
+  const inputVisita = document.getElementById('input-visita');
+  if (inputVisita && inputVisita.value && !pendingEdits['VISITA 2026']) {
+    pendingEdits['VISITA 2026'] = isoToItalianDate(inputVisita.value);
+  }
+
   if (Object.keys(pendingEdits).length === 0) {
     showToast('Nessuna modifica da salvare.');
     return;
