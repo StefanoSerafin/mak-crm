@@ -2710,7 +2710,28 @@ class MapModule {
       this.mapLayers[entry.layerKey].removeLayer(entry.marker);
     }
     if (this.cfg.recordAgenda && entry && entry.client) {
-      addAgendaEntry(entry.client);
+      const c = entry.client;
+      addAgendaEntry(c);
+
+      // Aggiorna anche il foglio Clienti: data visita + incrementa N. VISITE
+      const todayIso = formatDateKey(new Date());           // yyyy-mm-dd
+      const todayIt  = isoToItalianDate(todayIso);          // dd/mm/yyyy
+      const nVisite  = parseInt(c['N. VISITE'] || 0) + 1;
+
+      // Aggiorna localmente il cliente
+      const idx = allClients.findIndex(x => String(x['COD.']) === cod);
+      if (idx >= 0) {
+        allClients[idx]['VISITA 2026'] = todayIt;
+        allClients[idx]['N. VISITE']   = nVisite;
+      }
+
+      // Scrivi sul foglio in background
+      const clienteName = c['CLIENTE'] || '';
+      const codice = c['COD.'];
+      writeToSheet(clienteName, codice, {
+        'VISITA 2026': todayIt,
+        'N. VISITE':   nVisite
+      }).catch(e => console.warn('writeToSheet da mappa:', e));
     }
     delete this.clientMarkers[cod];
     this.renderLegend();
