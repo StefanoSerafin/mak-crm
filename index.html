@@ -2168,6 +2168,45 @@ async function saveEdits(clienteName, codice) {
 
   if (success) {
     showToast('✓ Salvato su Google Sheet');
+
+    // Se è stata salvata una data visita, registra in agenda
+    if (pendingEdits['VISITA 2026']) {
+      const dataVisita = pendingEdits['VISITA 2026']; // formato gg/mm/aaaa
+      const client = idx >= 0 ? allClients[idx] : null;
+      if (client) {
+        // Converte gg/mm/aaaa → yyyy-mm-dd per la chiave agenda
+        const m = dataVisita.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        const agendaKey = m ? `${m[3]}-${m[2]}-${m[1]}` : null;
+        if (agendaKey) {
+          // Aggiunge all'agenda con la data della visita (non necessariamente oggi)
+          const cod = String(client['COD.'] || '');
+          if (!agendaData[agendaKey]) agendaData[agendaKey] = [];
+          if (!agendaData[agendaKey].some(e => e.cod === cod)) {
+            agendaData[agendaKey].push({
+              cod,
+              cliente: client['CLIENTE'] || '',
+              citta: client["CITTA'"] || '',
+              network: client['NETWORK'] || '',
+              tipo: client['TIPO'] || '',
+              prog26: (client['PROG26'] || '').trim().toUpperCase()
+            });
+            try { localStorage.setItem(AGENDA_KEY, JSON.stringify(agendaData)); } catch(e) {}
+            // Scrivi su sheet agenda via JSONP
+            jsonpCall({
+              action: 'addAgenda',
+              data: agendaKey,
+              cod,
+              cliente: client['CLIENTE'] || '',
+              citta: client["CITTA'"] || '',
+              network: client['NETWORK'] || '',
+              tipo: client['TIPO'] || '',
+              prog26: (client['PROG26'] || '').trim().toUpperCase()
+            }).catch(e => console.warn('addAgenda da scheda:', e));
+          }
+        }
+      }
+    }
+
     pendingEdits = {};
     const btn = document.getElementById('btn-save');
     if (btn) btn.style.background = '';
