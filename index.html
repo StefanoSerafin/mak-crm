@@ -1420,12 +1420,26 @@
         </div>
         <a class="btn btn-primary" href="https://www.google.com/maps/d/u/0/edit?hl=it&mid=1dVqRMykyIvlCCX3XfqAqkSmaiZI" target="_blank">✏️ Modifica</a>
       </div>
-      <iframe
-        id="giro-iframe"
-        src="https://www.google.com/maps/d/embed?mid=1dVqRMykyIvlCCX3XfqAqkSmaiZI&hl=it"
-        style="flex:1;border:none;width:100%;min-height:0;"
-        allowfullscreen>
-      </iframe>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px;background:var(--col-surface2);">
+        <div style="font-size:48px">🗺</div>
+        <div style="font-size:16px;font-weight:700;color:var(--col-text)">Mappa Giro Visite</div>
+        <div style="font-size:13px;color:var(--col-text-muted);text-align:center;max-width:280px">
+          La tua mappa personalizzata con i clienti pianificati per il giro visite.
+        </div>
+        <a href="https://www.google.com/maps/d/u/0/viewer?mid=1dVqRMykyIvlCCX3XfqAqkSmaiZI&hl=it"
+           target="_blank"
+           style="display:block;width:100%;max-width:320px;padding:14px;background:var(--col-teal);color:#fff;border-radius:var(--radius);text-align:center;font-weight:700;font-size:15px;text-decoration:none;">
+          📍 Apri mappa (visualizza)
+        </a>
+        <a href="https://www.google.com/maps/d/u/0/edit?hl=it&mid=1dVqRMykyIvlCCX3XfqAqkSmaiZI"
+           target="_blank"
+           style="display:block;width:100%;max-width:320px;padding:14px;background:var(--col-surface);color:var(--col-text);border:1px solid var(--col-border-strong);border-radius:var(--radius);text-align:center;font-weight:700;font-size:15px;text-decoration:none;">
+          ✏️ Apri mappa (modifica)
+        </a>
+        <div style="font-size:11px;color:var(--col-text-muted);text-align:center;max-width:280px;margin-top:8px">
+          Su iPhone e iPad si apre direttamente in Google Maps o nel browser.
+        </div>
+      </div>
     </div>
   </div>
 
