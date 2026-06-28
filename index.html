@@ -2617,7 +2617,6 @@ class MapModule {
     try { localStorage.setItem(this.cfg.geocodeCacheKey, JSON.stringify(this.geocodeCache)); } catch(e) {}
   }
   loadHiddenClients() {
-    if (!this.cfg.hiddenStorageKey) return new Set();
     try {
       const arr = JSON.parse(localStorage.getItem(this.cfg.hiddenStorageKey) || '[]');
       return new Set(arr.map(String));
@@ -2625,10 +2624,26 @@ class MapModule {
   }
   saveHiddenClients() {
     if (!this.cfg.hiddenStorageKey) return;
-    try { localStorage.setItem(this.cfg.hiddenStorageKey, JSON.stringify(Array.from(this.hiddenClients))); } catch(e) {}
+    try {
+      localStorage.setItem(this.cfg.hiddenStorageKey,
+        JSON.stringify(Array.from(this.hiddenClients)));
+    } catch(e) {}
+  }
+  async syncHiddenFromSheet() {
+    if (!this.cfg.hiddenSheetSync) return;
+    try {
+      const data = await jsonpCall({ action: 'getHiddenPins' });
+      if (data && Array.isArray(data.cods)) {
+        this.hiddenClients = new Set(data.cods.map(String));
+        this.saveHiddenClients();
+        console.log('[MapHidden] Sincronizzati', data.cods.length, 'pin nascosti');
+      }
+    } catch(e) {
+      console.warn('[MapHidden] Sync fallita, uso cache locale:', e.message);
+    }
   }
 
-  init() {
+  async init() {
     if (this.mapInstance) return;
     try {
       this.mapInstance = L.map(this.cfg.containerId, { preferCanvas: true }).setView([45.50, 9.30], 10);
@@ -2641,10 +2656,23 @@ class MapModule {
         this.mapLayers[key] = L.layerGroup().addTo(this.mapInstance);
       });
 
+      // Carica prima dalla cache locale per risposta immediata,
+      // poi sincronizza dallo sheet in background
       this.hiddenClients = this.loadHiddenClients();
       this.renderLegend();
       this.geocodeCache = this.loadGeocodeCache();
       this.startGeocoding();
+
+      // Sincronizza hidden dallo sheet (sovrascrive cache locale se diverso)
+      if (this.cfg.hiddenSheetSync) {
+        this.syncHiddenFromSheet().then(() => {
+          // Ricarica i pin con la lista aggiornata
+          Object.values(this.mapLayers).forEach(l => l.clearLayers());
+          this.clientMarkers = {};
+          this.renderLegend();
+          this.startGeocoding();
+        });
+      }
     } catch(e) {
       console.error('Errore inizializzazione mappa:', e);
       const el = document.getElementById(this.cfg.statusId);
@@ -2734,6 +2762,13 @@ class MapModule {
     if (!cod) return;
     this.hiddenClients.add(cod);
     this.saveHiddenClients();
+
+    // Scrivi sul sheet in background (sync cross-device)
+    if (this.cfg.hiddenSheetSync) {
+      jsonpCall({ action: 'addHiddenPin', cod }).catch(e =>
+        console.warn('[MapHidden] addHiddenPin fallito:', e.message));
+    }
+
     const entry = this.clientMarkers[cod];
     if (entry && this.mapLayers[entry.layerKey]) {
       this.mapLayers[entry.layerKey].removeLayer(entry.marker);
@@ -2741,23 +2776,15 @@ class MapModule {
     if (this.cfg.recordAgenda && entry && entry.client) {
       const c = entry.client;
       addAgendaEntry(c);
-
-      // Aggiorna anche il foglio Clienti: data visita + incrementa N. VISITE
-      const todayIso = formatDateKey(new Date());           // yyyy-mm-dd
-      const todayIt  = isoToItalianDate(todayIso);          // dd/mm/yyyy
+      const todayIso = formatDateKey(new Date());
+      const todayIt  = isoToItalianDate(todayIso);
       const nVisite  = parseInt(c['N. VISITE'] || 0) + 1;
-
-      // Aggiorna localmente il cliente
       const idx = allClients.findIndex(x => String(x['COD.']) === cod);
       if (idx >= 0) {
         allClients[idx]['VISITA 2026'] = todayIt;
         allClients[idx]['N. VISITE']   = nVisite;
       }
-
-      // Scrivi sul foglio in background
-      const clienteName = c['CLIENTE'] || '';
-      const codice = c['COD.'];
-      writeToSheet(clienteName, codice, {
+      writeToSheet(c['CLIENTE'] || '', c['COD.'], {
         'VISITA 2026': todayIt,
         'N. VISITE':   nVisite
       }).catch(e => console.warn('writeToSheet da mappa:', e));
@@ -2776,6 +2803,13 @@ class MapModule {
     if (!confirm(`Vuoi far tornare visibili sulla mappa tutti i ${this.hiddenClients.size} clienti segnati come visitati?`)) return;
     this.hiddenClients.clear();
     this.saveHiddenClients();
+
+    // Resetta anche lo sheet
+    if (this.cfg.hiddenSheetSync) {
+      jsonpCall({ action: 'resetHiddenPins' }).catch(e =>
+        console.warn('[MapHidden] resetHiddenPins fallito:', e.message));
+    }
+
     if (this.mapInstance) {
       Object.values(this.mapLayers).forEach(layer => layer.clearLayers());
       this.clientMarkers = {};
@@ -2920,6 +2954,7 @@ const visitMap = new MapModule({
   hiddenStorageKey: 'mak_map_hidden_v1',
   supportHide: true,
   recordAgenda: true,
+  hiddenSheetSync: true,
   categories: PROG26_CONFIG,
   categoryOrder: MAP_PROG26_KEYS,
   getCategoryKey: c => (c['PROG26'] || '').trim().toUpperCase(),
