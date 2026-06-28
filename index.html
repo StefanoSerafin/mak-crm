@@ -1380,6 +1380,7 @@
       <button class="hamburger-btn-mobile" aria-label="Menu">☰</button>
       <button class="map-tab active" data-tab="visite" onclick="switchMapTab('visite')">📍 Visite</button>
       <button class="map-tab" data-tab="tools" onclick="switchMapTab('tools')">🔧 Tool TPMS</button>
+      <button class="map-tab" data-tab="giro" onclick="switchMapTab('giro')">🗺 Giro Visite</button>
     </div>
 
     <div id="map-tab-visite" class="map-tab-content active">
@@ -1409,6 +1410,22 @@
         <div class="map-legend-items" id="map-tools-legend-items"></div>
       </div>
       <div id="map-tools-container"></div>
+    </div>
+
+    <div id="map-tab-giro" class="map-tab-content">
+      <div class="dash-topbar">
+        <div style="flex:1">
+          <div class="dash-title">Giro Visite</div>
+          <div class="dash-subtitle">La tua mappa Google per la programmazione visite</div>
+        </div>
+        <a class="btn btn-primary" href="https://www.google.com/maps/d/u/0/edit?hl=it&mid=1dVqRMykyIvlCCX3XfqAqkSmaiZI" target="_blank">✏️ Modifica</a>
+      </div>
+      <iframe
+        id="giro-iframe"
+        src="https://www.google.com/maps/d/embed?mid=1dVqRMykyIvlCCX3XfqAqkSmaiZI&hl=it"
+        style="flex:1;border:none;width:100%;min-height:0;"
+        allowfullscreen>
+      </iframe>
     </div>
   </div>
 
@@ -2986,8 +3003,9 @@ function switchMapTab(tab) {
   document.querySelectorAll('.map-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.getElementById('map-tab-visite').classList.toggle('active', tab === 'visite');
   document.getElementById('map-tab-tools').classList.toggle('active', tab === 'tools');
+  document.getElementById('map-tab-giro').classList.toggle('active', tab === 'giro');
   if (tab === 'visite') visitMap.init();
-  else toolMap.init();
+  else if (tab === 'tools') toolMap.init();
   setTimeout(() => {
     if (tab === 'visite' && visitMap.mapInstance) visitMap.mapInstance.invalidateSize();
     if (tab === 'tools' && toolMap.mapInstance) toolMap.mapInstance.invalidateSize();
