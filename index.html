@@ -2750,16 +2750,16 @@ class MapModule {
     const cod = escJs(String(c['COD.'] || ''));
     const mapsQ = encodeURIComponent([c['INDIRIZZO'], c['CAP'], c["CITTA'"], c['PR'], 'Italia'].filter(Boolean).join(', '));
 
-    // Data breve gg/mm — gestisce sia dd/mm/yyyy che yyyy-mm-dd
+    // Data breve gg/mm/aa — gestisce sia dd/mm/yyyy che yyyy-mm-dd
     function shortDate(d) {
       if (!d) return '';
       const s = String(d).trim();
-      // formato dd/mm/yyyy o dd/mm/aa
-      const m1 = s.match(/^(\d{2})\/(\d{2})/);
-      if (m1) return `${m1[1]}/${m1[2]}`;
+      // formato dd/mm/yyyy
+      const m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{2,4})/);
+      if (m1) return `${m1[1]}/${m1[2]}/${m1[3].slice(-2)}`;
       // formato yyyy-mm-dd (anche con ore)
       const m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if (m2) return `${m2[3]}/${m2[2]}`;
+      if (m2) return `${m2[3]}/${m2[2]}/${m2[1].slice(-2)}`;
       return s.slice(0, 5);
     }
 
