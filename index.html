@@ -2258,6 +2258,7 @@ async function saveEdits(clienteName, codice) {
               prog26: (client['PROG26'] || '').trim().toUpperCase()
             });
             try { localStorage.setItem(AGENDA_KEY, JSON.stringify(agendaData)); } catch(e) {}
+            agendaLoaded = false; // forza ricaricamento al prossimo accesso all'agenda
             // Scrivi su sheet agenda via JSONP
             jsonpCall({
               action: 'addAgenda',
