@@ -2767,8 +2767,11 @@ class MapModule {
     function lastAcq(cat) {
       const d24 = c[`${cat} 24`] || '';
       const d25 = c[`${cat} 25`] || '';
-      if (d25) return shortDate(d25);
-      if (d24) return shortDate(d24);
+      const invalid = ['', '0', 'NO', 'nan', 'NaN', 'None'];
+      const v25 = invalid.includes(String(d25).trim()) ? '' : String(d25).trim();
+      const v24 = invalid.includes(String(d24).trim()) ? '' : String(d24).trim();
+      if (v25) return shortDate(v25);
+      if (v24) return shortDate(v24);
       return '';
     }
 
