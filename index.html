@@ -2565,7 +2565,11 @@ function buildMapsLink(c) {
   if (citta) parts.push(citta);
   if (pr) parts.push(pr);
   parts.push('Italia');
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(parts.join(', '))}`;
+  const dest = encodeURIComponent(parts.join(', '));
+  const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  return isIos
+    ? `comgooglemaps://?daddr=${dest}&directionsmode=driving`
+    : `https://www.google.com/maps/dir/?api=1&destination=${dest}`;
 }
 
 async function geocodeQuery(query, mod) {
@@ -2749,7 +2753,11 @@ class MapModule {
   buildPopupFromGeodataRow(c, pc) {
     const cod = escJs(String(c['COD.'] || ''));
     const mapsQ = encodeURIComponent([c['INDIRIZZO'], c['CAP'], c["CITTA'"], c['PR'], 'Italia'].filter(Boolean).join(', '));
-
+    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${mapsQ}`;
+    const mapsUrlIos = `comgooglemaps://?daddr=${mapsQ}&directionsmode=driving`;
+    // Su iOS usiamo comgooglemaps:// che apre Google Maps con navigazione diretta
+    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const mapsHref = isIos ? mapsUrlIos : mapsUrl;
     // Data breve gg/mm/aa — gestisce sia dd/mm/yyyy che yyyy-mm-dd
     function shortDate(d) {
       if (!d) return '';
@@ -2790,8 +2798,8 @@ class MapModule {
         <div style="font-weight:700;font-size:13px;margin-bottom:2px">${c['CLIENTE'] || '—'}</div>
         <div style="font-size:11px;color:#666;margin-bottom:4px">${[c['TIPO'], c['NETWORK']].filter(Boolean).join(' · ')}</div>
         <div class="map-popup-pill" style="background:${pc.bg};color:${pc.color};margin-bottom:6px">${pc.label}</div>
-        ${c['INDIRIZZO'] ? `<div style="font-size:11px;margin-bottom:3px">📍 <a href="https://www.google.com/maps/dir/?api=1&destination=${mapsQ}" target="_blank" style="color:var(--col-teal-dark)">${c['INDIRIZZO']}, ${c["CITTA'"]}</a></div>` : ''}
-        ${c['TELEFONO'] ? `<div style="font-size:11px;margin-bottom:2px">📞 ${c['TELEFONO']}${c['CELL'] && c['CELL'] !== c['TELEFONO'] ? ' · 📱 ' + c['CELL'] : ''}</div>` : (c['CELL'] ? `<div style="font-size:11px;margin-bottom:2px">📱 ${c['CELL']}</div>` : '')}
+        ${c['NOME'] ? `<div style="font-size:11px;margin-bottom:3px">👤 ${c['NOME']}</div>` : ''}
+        ${c['INDIRIZZO'] ? `<div style="font-size:11px;margin-bottom:3px">📍 <a href="${mapsHref}" target="_blank" style="color:var(--col-teal-dark)">${c['INDIRIZZO']}, ${c["CITTA'"]}</a></div>` : ''}
         ${c['TOOL'] ? `<div style="font-size:11px;margin-bottom:2px">🔧 ${c['TOOL']}</div>` : ''}
         ${c['VISITA 2026'] ? `<div style="font-size:11px;margin-bottom:2px">📅 Vis26: ${shortDate(c['VISITA 2026'])}${c['N. VISITE'] ? ' (n.' + c['N. VISITE'] + ')' : ''}</div>` : ''}
         ${c['VISITA 2025'] ? `<div style="font-size:11px;margin-bottom:4px;color:#888">Vis25: ${shortDate(c['VISITA 2025'])}</div>` : ''}
