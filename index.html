@@ -2703,7 +2703,7 @@ class MapModule {
     geodata.forEach(c => {
       const cod = String(c['COD.'] || '');
       if (this.hiddenClients.has(cod)) { hidden++; return; }
-      const key = (c['PROG26'] || '').trim().toUpperCase();
+      const key = this.cfg.getCategoryKey(c);
       if (!this.mapLayers[key]) return;
       const pc = this.cfg.categories[key];
       if (!pc) return;
@@ -2724,7 +2724,7 @@ class MapModule {
       }
     });
     const el = document.getElementById(this.cfg.statusId);
-    if (el) el.textContent = `${plotted} clienti da visitare sulla mappa · ${hidden} già visitati`;
+    if (el) el.textContent = `${plotted} clienti sulla mappa · ${hidden} nascosti`;
     this.renderLegend();
   }
 
