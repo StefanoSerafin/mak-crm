@@ -1373,6 +1373,13 @@
         </table>
       </div>
     </div>
+
+    <div class="dash-grid" style="grid-template-columns:1fr">
+      <div class="dash-section">
+        <div class="dash-section-title">Clienti per linea prodotto (24+25)</div>
+        <div class="bar-list" id="dash-prodotti"></div>
+      </div>
+    </div>
   </div>
 
   <div id="map-view">
@@ -2318,23 +2325,32 @@ const BAR_PALETTE = ['#1D9E75', '#185FA5', '#BA7517', '#534AB7', '#A32D2D', '#3C
 function renderDashboard() {
   if (!allClients.length) return;
 
+  const INVALID_VAL = new Set(['', '0', 'NO', 'nan', 'NaN', 'None', '#N/D']);
+  const hasVal = v => v && !INVALID_VAL.has(String(v).trim());
+
   const sum = (arr, key) => arr.reduce((a, c) => a + numFat(c[key]), 0);
   const fat25 = sum(allClients, '2025');
   const fat26 = sum(allClients, '2026');
   const deltaPct = fat25 > 0 ? ((fat26 - fat25) / fat25 * 100) : 0;
 
-  const visitati = allClients.filter(c => c['VISITA 2026'] && c['VISITA 2026'].toString().trim() !== '').length;
-  const visPct = allClients.length ? Math.round((visitati / allClients.length) * 100) : 0;
+  // Clienti totali = chi ha fatturato nel 2025
+  const clientiFat25 = allClients.filter(c => numFat(c['2025']) > 0).length;
+
+  // Visite: solo su clienti con programmazione (WORKBOX + DORMIENTI + OK24NO25 + OK25NOVIS + varianti)
+  const PROG_CON_VISITA = new Set(['WORKBOX','DORMIENTI','OK24NO25','OK25NOVIS','CALO','OK23NO24','OK24NOVIS','MAK25SP']);
+  const clientiProgrammati = allClients.filter(c => PROG_CON_VISITA.has((c['PROG26'] || '').trim().toUpperCase()));
+  const visitati = clientiProgrammati.filter(c => c['VISITA 2026'] && c['VISITA 2026'].toString().trim() !== '').length;
+  const visPct = clientiProgrammati.length ? Math.round((visitati / clientiProgrammati.length) * 100) : 0;
 
   const clientiAttivi26 = allClients.filter(c => numFat(c['2026']) > 0).length;
 
   // ── KPI cards ──
   const cards = [
-    { label: 'Clienti totali', value: allClients.length.toLocaleString('it-IT') },
+    { label: 'Clienti attivi 2025', value: clientiFat25.toLocaleString('it-IT'), sub: 'fatturato anno prec.' },
     { label: 'Fatturato 2025', value: formatK(fat25) },
     { label: 'Fatturato 2026', value: formatK(fat26), delta: deltaPct },
     { label: 'Clienti fatturanti 2026', value: clientiAttivi26.toLocaleString('it-IT') },
-    { label: 'Visite 2026', value: `${visitati} / ${allClients.length}`, sub: `${visPct}%` },
+    { label: 'Visite 2026', value: `${visitati} / ${clientiProgrammati.length}`, sub: `${visPct}% dei programmati` },
   ];
 
   document.getElementById('dash-kpi-cards').innerHTML = cards.map(c => {
@@ -2344,7 +2360,7 @@ function renderDashboard() {
       const sign = c.delta > 0 ? '+' : '';
       deltaHtml = `<div class="kpi-delta ${cls}">${sign}${c.delta.toFixed(1)}% vs 2025</div>`;
     } else if (c.sub) {
-      deltaHtml = `<div class="kpi-delta neutral">${c.sub} visitati</div>`;
+      deltaHtml = `<div class="kpi-delta neutral">${c.sub}</div>`;
     }
     return `<div class="kpi-card">
       <div class="kpi-label">${c.label}</div>
@@ -2426,12 +2442,45 @@ function renderDashboard() {
       <div class="progress-label">${visPct}%</div>
     </div>
     <div style="font-size:12px;color:var(--col-text-muted);line-height:1.6">
-      <strong style="color:var(--col-text)">${visitati}</strong> clienti visitati su <strong style="color:var(--col-text)">${allClients.length}</strong><br>
-      <strong style="color:var(--col-red)">${allClients.length - visitati}</strong> ancora da visitare nel 2026
+      <strong style="color:var(--col-text)">${visitati}</strong> visitati su <strong style="color:var(--col-text)">${clientiProgrammati.length}</strong> programmati<br>
+      <strong style="color:var(--col-red)">${clientiProgrammati.length - visitati}</strong> ancora da visitare nel 2026
     </div>
   `;
 
-  // ── Top 15 clienti fatturato 2026 ──
+  // ── Linee prodotto ──
+  const LINEE = [
+    { key: 'LEGA',       label: '🔵 Lega',      cols: ['LEGA 24','LEGA 25'] },
+    { key: 'ACCIAIO',    label: '⚙️ Acciaio',   cols: ['ACCIAIO 24','ACCIAIO 25'] },
+    { key: 'NPK',        label: '🔩 NPK/Dadi',  cols: ['NPK 24','NPK 25'] },
+    { key: 'TPMS',       label: '📡 TPMS',      cols: ['TPMS 24','TPMS 25'] },
+    { key: 'CALZE',      label: '🧤 Calze',     cols: ['CALZE 24','CALZE 25'] },
+    { key: 'CATENE',     label: '⛓️ Catene',    cols: ['CATENE 24','CATENE 25'] },
+    { key: 'FORD',       label: '🚗 Ford/Kit',  cols: ['FORD 24','FORD 25'] },
+    { key: 'PNEUMATICO', label: '🟢 Pneumatici',cols: ['PNEUMATICO 24','PNEUMATICO 25'] },
+    { key: 'CORA',       label: '🔴 Cora',      cols: ['CORA 24','CORA 25'] },
+    { key: 'INGERSOLL',  label: '🔧 Ingersoll', cols: ['INGERSOLL 24','INGERSOLL 25'] },
+  ];
+  const INVALID_PROD = new Set(['', '0', 'NO', 'nan', 'NaN', 'None', '#N/D']);
+  const lineeData = LINEE.map(l => {
+    const count = allClients.filter(c =>
+      l.cols.some(col => c[col] && !INVALID_PROD.has(String(c[col]).trim()))
+    ).length;
+    return { ...l, count };
+  }).sort((a, b) => b.count - a.count);
+  const maxLinea = Math.max(...lineeData.map(l => l.count), 1);
+  const lineeColors = ['#1565C0','#37474F','#5D4037','#1B5E20','#4A148C','#BF360C','#E65100','#006064','#880E4F','#33691E'];
+  const prodEl = document.getElementById('dash-prodotti');
+  if (prodEl) {
+    prodEl.innerHTML = lineeData.map((l, i) => {
+      const pct = Math.round((l.count / maxLinea) * 100);
+      const color = lineeColors[i % lineeColors.length];
+      return `<div class="bar-row">
+        <div class="bar-label" title="${l.label}">${l.label}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+        <div class="bar-value">${l.count} clienti</div>
+      </div>`;
+    }).join('');
+  }
   const topClienti = [...allClients]
     .filter(c => numFat(c['2026']) > 0)
     .sort((a, b) => numFat(b['2026']) - numFat(a['2026']))
